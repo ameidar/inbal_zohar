@@ -1,5 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, NavLink, useNavigate } from 'react-router-dom';
+import {
+  LayoutDashboard, Truck, Wrench, ScanSearch, Fuel as FuelIcon, Package,
+  ShieldCheck, Wallet, Users, FileText, ChevronDown, ChevronUp, LogOut
+} from 'lucide-react';
+
 import Dashboard from './pages/Dashboard';
 import Vehicles from './pages/Vehicles';
 import VehicleDetail from './pages/VehicleDetail';
@@ -18,52 +23,71 @@ function getUser() {
 }
 
 const NAV = [
-  { to: '/', icon: '🏠', label: 'לוח בקרה', exact: true },
+  { to: '/', icon: LayoutDashboard, label: 'לוח בקרה', exact: true },
   {
-    icon: '🚗', label: 'רכבים', to: '/vehicles',
+    icon: Truck, label: 'רכבים', to: '/vehicles',
     children: [
-      { to: '/maintenance', icon: '🔧', label: 'טיפולים' },
-      { to: '/inspections', icon: '🔍', label: 'בדיקות' },
-      { to: '/fuel', icon: '⛽', label: 'דלק' },
-      { to: '/tools', icon: '🔩', label: 'כלי עבודה' },
+      { to: '/maintenance', icon: Wrench,     label: 'טיפולים' },
+      { to: '/inspections', icon: ScanSearch, label: 'בדיקות' },
+      { to: '/fuel',        icon: FuelIcon,   label: 'דלק' },
+      { to: '/tools',       icon: Package,    label: 'כלי עבודה' },
     ]
   },
-  { to: '/insurance', icon: '🛡️', label: 'פוליסות' },
-  { to: '/finance', icon: '💰', label: 'כספים' },
-  { to: '/employees', icon: '👥', label: 'עובדים' },
-  { to: '/operator-license', icon: '📜', label: 'רישיון מפעיל' },
+  { to: '/insurance', icon: ShieldCheck, label: 'פוליסות' },
+  { to: '/finance',   icon: Wallet,      label: 'כספים' },
+  { to: '/employees', icon: Users,       label: 'עובדים' },
+  { to: '/operator-license', icon: FileText, label: 'רישיון מפעיל' },
 ];
+
+const ICON_SIZE = 17;
+
+function NavItem({ item }) {
+  const isActive = window.location.pathname === item.to ||
+    (item.exact ? false : window.location.pathname.startsWith(item.to + '/'));
+  const Icon = item.icon;
+  return (
+    <NavLink to={item.to} end={item.exact} className={({ isActive }) => isActive ? 'active' : ''}>
+      <span className="nav-icon"><Icon size={ICON_SIZE} strokeWidth={1.8} /></span>
+      {item.label}
+    </NavLink>
+  );
+}
 
 function NavGroup({ item }) {
   const location = window.location.pathname;
   const isChildActive = item.children.some(c => location.startsWith(c.to));
   const isParentActive = location === item.to || location.startsWith(item.to + '/');
   const [open, setOpen] = React.useState(isChildActive || isParentActive);
+  const Icon = item.icon;
 
   return (
     <div>
       <div
-        style={{ display:'flex', alignItems:'center', cursor:'pointer', gap:8,
-          padding:'10px 20px', color: (isParentActive||isChildActive) ? '#fff' : 'rgba(255,255,255,0.7)',
-          background: isParentActive && !isChildActive ? 'rgba(255,255,255,0.15)' : 'transparent',
-          borderRight: isParentActive && !isChildActive ? '3px solid #fff' : '3px solid transparent',
-          fontSize:14, userSelect:'none' }}
+        className={`sidebar-nav-item${isParentActive && !isChildActive ? ' active' : ''}`}
+        style={{ justifyContent: 'space-between' }}
         onClick={() => setOpen(o => !o)}
       >
-        <NavLink to={item.to} style={{ flex:1, color:'inherit', textDecoration:'none', display:'flex', alignItems:'center', gap:8 }}
-          onClick={e => e.stopPropagation()}>
-          <span>{item.icon}</span> {item.label}
-        </NavLink>
-        <span style={{ fontSize:10, opacity:0.7 }}>{open ? '▲' : '▼'}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}
+          onClick={e => { e.stopPropagation(); window.location.href = item.to; }}>
+          <span className="nav-icon"><Icon size={ICON_SIZE} strokeWidth={1.8} /></span>
+          {item.label}
+        </div>
+        <span style={{ color: 'var(--gray)', display: 'flex' }}>
+          {open ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+        </span>
       </div>
       {open && (
-        <div style={{ paddingRight:16 }}>
-          {item.children.map(c => (
-            <NavLink key={c.to} to={c.to} className={({ isActive }) => isActive ? 'active' : ''}
-              style={{ paddingRight:28, fontSize:13 }}>
-              <span className="nav-icon">{c.icon}</span> {c.label}
-            </NavLink>
-          ))}
+        <div style={{ paddingRight: 12 }}>
+          {item.children.map(c => {
+            const CIcon = c.icon;
+            return (
+              <NavLink key={c.to} to={c.to} className={({ isActive }) => isActive ? 'active' : ''}
+                style={{ paddingRight: 30, fontSize: 13 }}>
+                <span className="nav-icon"><CIcon size={15} strokeWidth={1.8} /></span>
+                {c.label}
+              </NavLink>
+            );
+          })}
         </div>
       )}
     </div>
@@ -81,38 +105,55 @@ function Layout({ children }) {
   }
 
   const pageTitles = {
-    '/': 'לוח בקרה', '/vehicles': 'ניהול רכבים', '/maintenance': 'טיפולים',
-    '/inspections': 'בדיקות רכב', '/insurance': 'פוליסות ביטוח', '/fuel': 'ניהול דלק',
-    '/employees': 'עובדים', '/tools': 'כלי עבודה', '/finance': 'כספים',
-    '/operator-license': 'רישיון מפעיל'
+    '/': 'לוח בקרה',
+    '/vehicles': 'ניהול רכבים',
+    '/maintenance': 'טיפולים',
+    '/inspections': 'בדיקות רכב',
+    '/insurance': 'פוליסות ביטוח',
+    '/fuel': 'ניהול דלק',
+    '/employees': 'עובדים',
+    '/tools': 'כלי עבודה',
+    '/finance': 'כספים',
+    '/operator-license': 'רישיון מפעיל',
   };
   const currentPath = window.location.pathname;
-  const title = pageTitles[currentPath] || 'מערכת ניהול';
+  const pathKey = Object.keys(pageTitles).find(k => currentPath === k || (k !== '/' && currentPath.startsWith(k + '/')));
+  const title = pageTitles[pathKey] || 'מערכת ניהול';
 
   return (
     <div className="layout">
       <aside className="sidebar">
         <div className="sidebar-logo">
-          <h2>🚛 מערכת ניהול</h2>
+          <h2>
+            <Truck size={18} strokeWidth={2} style={{ color: 'var(--primary)' }} />
+            מערכת ניהול
+          </h2>
           <p>הצוות תשתיות בע"מ</p>
         </div>
         <nav className="sidebar-nav">
           {NAV.map(n => n.children ? (
             <NavGroup key={n.to} item={n} />
           ) : (
-            <NavLink key={n.to} to={n.to} end={n.exact} className={({ isActive }) => isActive ? 'active' : ''}>
-              <span className="nav-icon">{n.icon}</span> {n.label}
-            </NavLink>
+            <NavItem key={n.to} item={n} />
           ))}
         </nav>
         <div className="sidebar-footer">גרסה 1.0</div>
       </aside>
+
       <div className="main-content">
         <header className="topbar">
           <h1>{title}</h1>
           <div className="topbar-actions">
-            <span className="user-info">{user?.full_name || user?.username} ({user?.role === 'admin' ? 'מנהל' : 'מדווח'})</span>
-            <button className="btn-logout" onClick={logout}>יציאה</button>
+            <span className="user-info">
+              {user?.full_name || user?.username}
+              <span style={{ marginRight: 4, color: '#9ca3af' }}>
+                ({user?.role === 'admin' ? 'מנהל' : 'מדווח'})
+              </span>
+            </span>
+            <button className="btn-logout" onClick={logout} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <LogOut size={13} />
+              יציאה
+            </button>
           </div>
         </header>
         <main className="page">{children}</main>
