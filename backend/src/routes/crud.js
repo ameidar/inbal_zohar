@@ -4,6 +4,7 @@
  */
 const express = require('express');
 const pool = require('../db');
+const webhook = require('../lib/webhookEmitter');
 
 function crud(table, fields, opts = {}) {
   const router = express.Router();
@@ -51,6 +52,7 @@ function crud(table, fields, opts = {}) {
       const sql = `INSERT INTO ${table} (${cols.join(',')}) VALUES (${cols.map((_,i)=>'$'+(i+1)).join(',')}) RETURNING *`;
       const r = await pool.query(sql, vals);
       res.status(201).json(r.rows[0]);
+      webhook.emit(`${table}.create`, r.rows[0]);
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
@@ -66,6 +68,7 @@ function crud(table, fields, opts = {}) {
       const r = await pool.query(sql, vals);
       if (!r.rows[0]) return res.status(404).json({ error: 'Not found' });
       res.json(r.rows[0]);
+      webhook.emit(`${table}.update`, r.rows[0]);
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
@@ -75,6 +78,7 @@ function crud(table, fields, opts = {}) {
       const r = await pool.query(`DELETE FROM ${table} WHERE id=$1 RETURNING id`, [req.params.id]);
       if (!r.rows[0]) return res.status(404).json({ error: 'Not found' });
       res.json({ deleted: req.params.id });
+      webhook.emit(`${table}.delete`, { id: req.params.id });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 

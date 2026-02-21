@@ -20,6 +20,9 @@ app.use('/api/v1', apiKeyAuth, require('./routes/api-v1'));
 // Admin: manage API keys (JWT + admin only)
 app.use('/api/admin/api-keys', auth, adminOnly, require('./routes/api-keys'));
 
+// Admin: manage webhook subscriptions (JWT + admin only)
+app.use('/api/admin/webhooks', auth, adminOnly, require('./routes/webhooks'));
+
 // Protected routes
 app.use('/api/dashboard', auth, require('./routes/dashboard'));
 app.use('/api/vehicles', auth, require('./routes/vehicles'));

@@ -225,3 +225,76 @@ Authorization: Bearer <jwt-token>
 | `403` | Scope not allowed |
 | `404` | Resource not found |
 | `500` | Server error |
+
+---
+
+## Outbound Webhooks
+
+The system fires `POST` requests to registered URLs on every data change.
+
+### Payload format
+
+```json
+{
+  "event": "vehicle.update",
+  "timestamp": "2026-02-21T11:38:00.000Z",
+  "data": { ...updated record... }
+}
+```
+
+### Available events
+
+| Event | Trigger |
+|-------|---------|
+| `vehicle.create` | New vehicle added |
+| `vehicle.update` | Vehicle record updated |
+| `vehicle.delete` | Vehicle deleted |
+| `maintenance.create` | Maintenance record created |
+| `maintenance.update` | Maintenance record updated |
+| `employees.create` | Employee added |
+| `employees.update` | Employee updated |
+| `inspections.create` | Inspection added |
+| `insurance_policies.create` | Policy added |
+| `insurance_policies.update` | Policy updated |
+| `*` | All events |
+
+### Signature verification
+
+If a `secret` is set on the subscription, every request includes:
+```
+X-Fleet-Signature: sha256=<hmac-sha256-of-body>
+```
+Verify this in your endpoint to ensure the request is authentic.
+
+### Managing webhook subscriptions (Admin)
+
+```http
+GET    /api/admin/webhooks         — list subscriptions
+POST   /api/admin/webhooks         — create new subscription
+PUT    /api/admin/webhooks/:id     — update (url, events, active)
+DELETE /api/admin/webhooks/:id     — delete subscription
+POST   /api/admin/webhooks/:id/test — send test event
+```
+
+#### Create example
+```json
+POST /api/admin/webhooks
+Authorization: Bearer <jwt>
+
+{
+  "name": "Make Integration",
+  "url": "https://hook.eu2.make.com/your-webhook-id",
+  "events": ["vehicle.update", "maintenance.create"],
+  "generateSecret": true
+}
+```
+
+Response includes `secret` **only on creation** — store it securely.
+
+### Make (Integromat) setup
+
+1. Create scenario → **Webhooks → Custom webhook**
+2. Copy the webhook URL from Make
+3. Register it via `POST /api/admin/webhooks`
+4. Choose events: `["*"]` for all, or specific ones
+5. Fleet will push JSON to Make on every matching change

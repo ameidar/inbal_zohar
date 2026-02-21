@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const pool = require('../db');
+const webhook = require('../lib/webhookEmitter');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -66,6 +67,7 @@ router.post('/', async (req, res) => {
     const vals = cols.map(f => data[f]);
     const r = await pool.query(`INSERT INTO vehicles (${cols.join(',')}) VALUES (${cols.map((_,i)=>'$'+(i+1)).join(',')}) RETURNING *`, vals);
     res.status(201).json(r.rows[0]);
+    webhook.emit('vehicle.create', r.rows[0]);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -78,6 +80,7 @@ router.put('/:id', async (req, res) => {
     const r = await pool.query(`UPDATE vehicles SET ${cols.map((f,i)=>`${f}=$${i+1}`).join(',')} WHERE id=$${vals.length} RETURNING *`, vals);
     if (!r.rows[0]) return res.status(404).json({ error: 'Not found' });
     res.json(r.rows[0]);
+    webhook.emit('vehicle.update', r.rows[0]);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -86,6 +89,7 @@ router.delete('/:id', async (req, res) => {
     const r = await pool.query('DELETE FROM vehicles WHERE id=$1 RETURNING id', [req.params.id]);
     if (!r.rows[0]) return res.status(404).json({ error: 'Not found' });
     res.json({ deleted: req.params.id });
+    webhook.emit('vehicle.delete', { id: req.params.id });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
