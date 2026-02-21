@@ -3,6 +3,7 @@ const cors = require('cors');
 const path = require('path');
 
 const { auth, adminOnly } = require('./middleware/auth');
+const { apiKeyAuth } = require('./middleware/apiKey');
 const crud = require('./routes/crud');
 
 const app = express();
@@ -11,6 +12,12 @@ app.use(express.json({ limit: '10mb' }));
 
 // Auth
 app.use('/api/auth', require('./routes/auth'));
+
+// External API v1 (API Key auth)
+app.use('/api/v1', apiKeyAuth, require('./routes/api-v1'));
+
+// Admin: manage API keys (JWT + admin only)
+app.use('/api/admin/api-keys', auth, adminOnly, require('./routes/api-keys'));
 
 // Protected routes
 app.use('/api/dashboard', auth, require('./routes/dashboard'));
