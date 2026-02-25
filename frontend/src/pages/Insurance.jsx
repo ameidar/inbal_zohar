@@ -223,9 +223,9 @@ export default function Insurance() {
                 <div className="form-group"><label className="form-label">תפוגת פוליסה</label><input className="form-control" type="date" value={form.expiry_date?.split('T')[0]||''} onChange={e=>f('expiry_date',e.target.value)}/></div>
               </div>
               <div className="form-row cols-3">
-                <div className="form-group"><label className="form-label">פרמיה כוללת (₪)</label><input className="form-control" type="number" value={form.total_premium||''} onChange={e=>f('total_premium',+e.target.value)}/></div>
-                <div className="form-group"><label className="form-label">מס' תשלומים</label><input className="form-control" type="number" value={form.num_payments||12} onChange={e=>f('num_payments',+e.target.value)}/></div>
-                <div className="form-group"><label className="form-label">יום חיוב בחודש</label><input className="form-control" type="number" min="1" max="28" value={form.first_charge_day||1} onChange={e=>f('first_charge_day',+e.target.value)}/></div>
+                <div className="form-group"><label className="form-label">פרמיה כוללת (₪)</label><input className="form-control" type="number" value={form.total_premium ?? ''} onChange={e=>f('total_premium', e.target.value === '' ? '' : +e.target.value)}/></div>
+                <div className="form-group"><label className="form-label">מס' תשלומים</label><input className="form-control" type="number" value={form.num_payments ?? 12} onChange={e=>f('num_payments', e.target.value === '' ? '' : +e.target.value)}/></div>
+                <div className="form-group"><label className="form-label">יום חיוב בחודש</label><input className="form-control" type="number" min="1" max="28" value={form.first_charge_day ?? 1} onChange={e=>f('first_charge_day', e.target.value === '' ? '' : +e.target.value)}/></div>
               </div>
               <div className="form-group"><label className="form-label">הערות</label><textarea className="form-control" rows={2} value={form.notes||''} onChange={e=>f('notes',e.target.value)}/></div>
             </div>

@@ -40,4 +40,4 @@ echo "👤 Admin: admin / admin123"
 echo "👤 Reporter: reporter / report123"
 echo ""
 
-cd backend && PORT=3010 node src/index.js
+cd backend && PORT=3010 DB_PORT=5433 node src/index.js

@@ -80,6 +80,11 @@ app.use('/api/diesel-refunds', auth, crud('diesel_refunds',
   { orderBy: 'period DESC' }
 ));
 
+app.use('/api/fuel-cards', auth, crud('fuel_cards',
+  ['vehicle_id','card_number','supplier','fuel_type','status','daily_limit','monthly_limit','notes'],
+  { orderBy: 'id' }
+));
+
 app.use('/api/operator-licenses', auth, crud('operator_licenses',
   ['license_number','license_type','issue_date','expiry_date','issuing_authority','status','notes'],
   { orderBy: 'expiry_date DESC' }

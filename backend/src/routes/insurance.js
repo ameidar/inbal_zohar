@@ -59,7 +59,7 @@ router.post('/', async (req, res) => {
     const r = await client.query(
       `INSERT INTO insurance_policies (vehicle_id, tool_id, policy_number, coverage_type, insurer, start_date, expiry_date, total_premium, num_payments, first_charge_day, charge_method_id, status, notes)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
-      [vehicle_id, tool_id, policy_number, coverage_type, insurer, start_date, expiry_date, total_premium, num_payments||1, first_charge_day||1, charge_method_id, status||'פעילה', notes]
+      [vehicle_id, tool_id, policy_number, coverage_type, insurer, start_date||null, expiry_date||null, total_premium, num_payments||1, first_charge_day||1, charge_method_id, status||'פעילה', notes]
     );
     const policy = r.rows[0];
     await createPayments(client, policy.id);
@@ -76,7 +76,8 @@ router.put('/:id', async (req, res) => {
     const data = req.body;
     const cols = fields.filter(f => data[f] !== undefined);
     if (!cols.length) return res.status(400).json({ error: 'No fields' });
-    const vals = cols.map(f => data[f]);
+    const dateFields = ['start_date', 'expiry_date'];
+    const vals = cols.map(f => (dateFields.includes(f) && data[f] === '') ? null : data[f]);
     vals.push(req.params.id);
     const r = await client.query(`UPDATE insurance_policies SET ${cols.map((f,i)=>`${f}=$${i+1}`).join(',')} WHERE id=$${vals.length} RETURNING *`, vals);
     if (!r.rows[0]) return res.status(404).json({ error: 'Not found' });
