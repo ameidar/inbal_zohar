@@ -1,6 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { api } from '../api/client';
+import Documents from './Documents';
+import MissingData from './MissingData';
+
+function DocumentsTab({ vehicleId }) {
+  return <Documents linkedEntityType="Vehicle" linkedEntityId={vehicleId} />;
+}
+
+function MissingDataTab({ vehicleId }) {
+  return <MissingData vehicleId={vehicleId} />;
+}
 
 function fmtDate(d) { return d ? new Date(d).toLocaleDateString('he-IL') : '—'; }
 function fmtCur(n) { return n != null ? `₪${Number(n).toLocaleString('he-IL')}` : '—'; }
@@ -22,7 +32,7 @@ export default function VehicleDetail() {
   const { id } = useParams();
   const [vehicle, setVehicle] = useState(null);
   const [tab, setTab] = useState('כללי');
-  const TABS = ['כללי','טיפולים','בדיקות','כרטיסי דלק','ביטוח','מיגון','כלי עבודה','החזרי סולר'];
+  const TABS = ['כללי','טיפולים','בדיקות','כרטיסי דלק','ביטוח','מיגון','כלי עבודה','החזרי סולר','מסמכים','נתונים חסרים'];
   const user = JSON.parse(localStorage.getItem('fleet_user') || '{}');
   const isAdmin = user.role === 'admin';
 
@@ -401,10 +411,10 @@ export default function VehicleDetail() {
     <div>
       {/* Header */}
       <div style={{ display:'flex', alignItems:'center', gap:16, marginBottom:20 }}>
-        <Link to="/vehicles" className="btn btn-secondary btn-sm">→ חזרה</Link>
+        <Link to="/dept/vehicles/list" className="btn btn-secondary btn-sm">→ חזרה</Link>
         <div>
           <h2 style={{ fontSize:22, fontWeight:700 }}>{vehicle.vehicle_number} {vehicle.nickname ? `— ${vehicle.nickname}` : ''}</h2>
-          <div style={{ fontSize:14, color:'#6b7280' }}>{vehicle.manufacturer} {vehicle.model} {vehicle.year} | {vehicle.asset_type} | {vehicle.fuel_type}</div>
+          <div style={{ fontSize:14, color:'#6b7280' }}>{vehicle.manufacturer} {vehicle.model} {vehicle.year} - {vehicle.asset_type} - {vehicle.fuel_type}</div>
         </div>
         <span className={`badge ${vehicle.status==='פעיל'?'badge-green':vehicle.status==='מושבת'?'badge-red':'badge-yellow'}`} style={{fontSize:14,padding:'4px 12px'}}>{vehicle.status}</span>
       </div>
@@ -854,6 +864,16 @@ export default function VehicleDetail() {
             </table>
           </div>
         </div>
+      )}
+
+      {/* ═══════════════ מסמכים ═══════════════ */}
+      {tab === 'מסמכים' && (
+        <DocumentsTab vehicleId={id} />
+      )}
+
+      {/* ═══════════════ נתונים חסרים ═══════════════ */}
+      {tab === 'נתונים חסרים' && (
+        <MissingDataTab vehicleId={id} />
       )}
 
       {/* Diesel Refund Modal */}

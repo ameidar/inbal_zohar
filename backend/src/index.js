@@ -26,8 +26,14 @@ app.use('/api/admin/webhooks', auth, adminOnly, require('./routes/webhooks'));
 // Protected routes
 app.use('/api/dashboard', auth, require('./routes/dashboard'));
 app.use('/api/vehicles', auth, require('./routes/vehicles'));
+app.use('/api/vehicles/:id/missing-data', auth, require('./routes/missing-data'));
 app.use('/api/insurance', auth, require('./routes/insurance'));
 app.use('/api/fuel', auth, require('./routes/fuel'));
+app.use('/api/payment-schedule', auth, require('./routes/payment-schedule'));
+app.use('/api/documents', auth, require('./routes/documents'));
+app.use('/api/tool-categories', auth, require('./routes/tool-categories'));
+app.use('/api/operator-license', auth, require('./routes/operator-license'));
+app.use('/api/duplicates', auth, require('./routes/duplicates'));
 
 // Generic CRUD routes
 app.use('/api/employees', auth, crud('employees',
@@ -70,10 +76,7 @@ app.use('/api/vehicle-security', auth, crud('vehicle_security',
   { orderBy: 'id' }
 ));
 
-app.use('/api/payment-methods', auth, crud('payment_methods',
-  ['name','payment_type','last_4_digits','charge_day','company','account_comprehensive','account_mandatory','notes'],
-  { orderBy: 'name' }
-));
+app.use('/api/payment-methods', auth, require('./routes/payment-methods'));
 
 app.use('/api/diesel-refunds', auth, crud('diesel_refunds',
   ['vehicle_id','period','liters','amount','refund_status','submission_date','actual_receipt_date','notes'],

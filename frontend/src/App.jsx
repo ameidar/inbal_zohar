@@ -1,10 +1,11 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate, NavLink, useNavigate } from 'react-router-dom';
-import {
-  LayoutDashboard, Truck, Wrench, ScanSearch, Fuel as FuelIcon, Package,
-  ShieldCheck, Wallet, Users, FileText, ChevronDown, ChevronUp, LogOut
-} from 'lucide-react';
+import React, { useState } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
+import { LogOut, Menu } from 'lucide-react';
 
+// Sidebar
+import Sidebar from './components/Sidebar';
+
+// Pages - existing
 import Dashboard from './pages/Dashboard';
 import Vehicles from './pages/Vehicles';
 import VehicleDetail from './pages/VehicleDetail';
@@ -18,85 +19,41 @@ import Finance from './pages/Finance';
 import OperatorLicense from './pages/OperatorLicense';
 import Login from './pages/Login';
 
+// Pages - new
+import VehiclesDashboard from './pages/VehiclesDashboard';
+import PaymentMethods from './pages/PaymentMethods';
+import PaymentSchedule from './pages/PaymentSchedule';
+import PaymentMethodsReport from './pages/PaymentMethodsReport';
+import Documents from './pages/Documents';
+import ToolCategories from './pages/ToolCategories';
+import Duplicates from './pages/Duplicates';
+import MissingData from './pages/MissingData';
+
 function getUser() {
   try { return JSON.parse(localStorage.getItem('fleet_user') || 'null'); } catch { return null; }
 }
 
-const NAV = [
-  { to: '/', icon: LayoutDashboard, label: 'לוח בקרה', exact: true },
-  {
-    icon: Truck, label: 'רכבים', to: '/vehicles',
-    children: [
-      { to: '/maintenance', icon: Wrench,     label: 'טיפולים' },
-      { to: '/inspections', icon: ScanSearch, label: 'בדיקות' },
-      { to: '/fuel',        icon: FuelIcon,   label: 'דלק' },
-      { to: '/tools',       icon: Package,    label: 'כלי עבודה' },
-    ]
-  },
-  { to: '/insurance', icon: ShieldCheck, label: 'פוליסות' },
-  { to: '/finance',   icon: Wallet,      label: 'כספים' },
-  { to: '/employees', icon: Users,       label: 'עובדים' },
-  { to: '/operator-license', icon: FileText, label: 'רישיון מפעיל' },
-];
-
-const ICON_SIZE = 17;
-
-function NavItem({ item }) {
-  const isActive = window.location.pathname === item.to ||
-    (item.exact ? false : window.location.pathname.startsWith(item.to + '/'));
-  const Icon = item.icon;
-  return (
-    <NavLink to={item.to} end={item.exact} className={({ isActive }) => isActive ? 'active' : ''}>
-      <span className="nav-icon"><Icon size={ICON_SIZE} strokeWidth={1.8} /></span>
-      {item.label}
-    </NavLink>
-  );
-}
-
-function NavGroup({ item }) {
-  const location = window.location.pathname;
-  const isChildActive = item.children.some(c => location.startsWith(c.to));
-  const isParentActive = location === item.to || location.startsWith(item.to + '/');
-  const [open, setOpen] = React.useState(isChildActive || isParentActive);
-  const Icon = item.icon;
-
-  return (
-    <div>
-      <div
-        className={`sidebar-nav-item${isParentActive && !isChildActive ? ' active' : ''}`}
-        style={{ justifyContent: 'space-between' }}
-        onClick={() => setOpen(o => !o)}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}
-          onClick={e => { e.stopPropagation(); window.location.href = item.to; }}>
-          <span className="nav-icon"><Icon size={ICON_SIZE} strokeWidth={1.8} /></span>
-          {item.label}
-        </div>
-        <span style={{ color: 'var(--gray)', display: 'flex' }}>
-          {open ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-        </span>
-      </div>
-      {open && (
-        <div style={{ paddingRight: 12 }}>
-          {item.children.map(c => {
-            const CIcon = c.icon;
-            return (
-              <NavLink key={c.to} to={c.to} className={({ isActive }) => isActive ? 'active' : ''}
-                style={{ paddingRight: 30, fontSize: 13 }}>
-                <span className="nav-icon"><CIcon size={15} strokeWidth={1.8} /></span>
-                {c.label}
-              </NavLink>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
+const PAGE_TITLES = {
+  '/dept/vehicles/dashboard': 'דשבורד רכבים',
+  '/dept/vehicles/list': 'ניהול רכבים',
+  '/dept/vehicles/maintenance/list': 'טיפולים',
+  '/dept/vehicles/inspections/list': 'בדיקות רכב',
+  '/dept/vehicles/fuel/invoices': 'ניהול דלק',
+  '/dept/vehicles/policies/list': 'פוליסות ביטוח',
+  '/dept/vehicles/policies/payments': 'לוח תשלומים',
+  '/dept/vehicles/payment-methods': 'אמצעי תשלום',
+  '/dept/vehicles/reports/payment-methods': 'דוח לפי אמצעי תשלום',
+  '/dept/vehicles/tools/list': 'כלי עבודה',
+  '/dept/vehicles/tools/categories': 'קטגוריות כלים',
+  '/dept/vehicles/documents': 'מרכז מסמכים',
+  '/dept/vehicles/operator-license': 'רישיון מפעיל',
+  '/dept/vehicles/duplicates': 'כפילויות',
+};
 
 function Layout({ children }) {
   const navigate = useNavigate();
   const user = getUser();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   function logout() {
     localStorage.removeItem('fleet_token');
@@ -104,45 +61,34 @@ function Layout({ children }) {
     navigate('/login');
   }
 
-  const pageTitles = {
-    '/': 'לוח בקרה',
-    '/vehicles': 'ניהול רכבים',
-    '/maintenance': 'טיפולים',
-    '/inspections': 'בדיקות רכב',
-    '/insurance': 'פוליסות ביטוח',
-    '/fuel': 'ניהול דלק',
-    '/employees': 'עובדים',
-    '/tools': 'כלי עבודה',
-    '/finance': 'כספים',
-    '/operator-license': 'רישיון מפעיל',
-  };
-  const currentPath = window.location.pathname;
-  const pathKey = Object.keys(pageTitles).find(k => currentPath === k || (k !== '/' && currentPath.startsWith(k + '/')));
-  const title = pageTitles[pathKey] || 'מערכת ניהול';
+  const path = window.location.pathname;
+  const titleKey = Object.keys(PAGE_TITLES).find(k => path === k || path.startsWith(k + '/'));
+  const title = PAGE_TITLES[titleKey] || 'מערכת ניהול';
 
   return (
     <div className="layout">
-      <aside className="sidebar">
-        <div className="sidebar-logo">
-          <h2>
-            <Truck size={18} strokeWidth={2} style={{ color: 'var(--primary)' }} />
-            מערכת ניהול
-          </h2>
-          <p>הצוות תשתיות בע"מ</p>
-        </div>
-        <nav className="sidebar-nav">
-          {NAV.map(n => n.children ? (
-            <NavGroup key={n.to} item={n} />
-          ) : (
-            <NavItem key={n.to} item={n} />
-          ))}
-        </nav>
-        <div className="sidebar-footer">גרסה 1.0</div>
-      </aside>
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div
+          className="sidebar-overlay"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       <div className="main-content">
         <header className="topbar">
-          <h1>{title}</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button
+              className="hamburger-btn"
+              onClick={() => setSidebarOpen(o => !o)}
+              aria-label="תפריט"
+            >
+              <Menu size={20} />
+            </button>
+            <h1 style={{ margin: 0 }}>{title}</h1>
+          </div>
           <div className="topbar-actions">
             <span className="user-info">
               {user?.full_name || user?.username}
@@ -172,21 +118,58 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/" element={<Navigate to="/dept/vehicles/dashboard" replace />} />
+
+        {/* Legacy route redirects */}
+        <Route path="/vehicles" element={<Navigate to="/dept/vehicles/list" replace />} />
+        <Route path="/vehicles/:id" element={<LegacyVehicleRedirect />} />
+        <Route path="/maintenance" element={<Navigate to="/dept/vehicles/maintenance/list" replace />} />
+        <Route path="/inspections" element={<Navigate to="/dept/vehicles/inspections/list" replace />} />
+        <Route path="/insurance" element={<Navigate to="/dept/vehicles/policies/list" replace />} />
+        <Route path="/fuel" element={<Navigate to="/dept/vehicles/fuel/invoices" replace />} />
+        <Route path="/tools" element={<Navigate to="/dept/vehicles/tools/list" replace />} />
+        <Route path="/operator-license" element={<Navigate to="/dept/vehicles/operator-license" replace />} />
+
+        <Route path="/dept/*" element={
+          <PrivateRoute>
+            <Layout>
+              <Routes>
+                {/* Dept root redirects */}
+                <Route path="vehicles" element={<Navigate to="/dept/vehicles/dashboard" replace />} />
+                <Route path="vehicles/dashboard" element={<VehiclesDashboard />} />
+                <Route path="vehicles/list" element={<Vehicles />} />
+                <Route path="vehicles/:id/overview" element={<VehicleDetail />} />
+                <Route path="vehicles/:id/missing-data" element={<MissingData />} />
+                <Route path="vehicles/maintenance/list" element={<Maintenance />} />
+                <Route path="vehicles/inspections/list" element={<Inspections />} />
+                <Route path="vehicles/fuel/invoices" element={<Fuel />} />
+                <Route path="vehicles/policies/list" element={<Insurance />} />
+                <Route path="vehicles/policies/payments" element={<PaymentSchedule />} />
+                <Route path="vehicles/payment-methods" element={<PaymentMethods />} />
+                <Route path="vehicles/tools/list" element={<Tools />} />
+                <Route path="vehicles/tools/categories" element={<ToolCategories />} />
+                <Route path="vehicles/documents" element={<Documents />} />
+                <Route path="vehicles/operator-license" element={<OperatorLicense />} />
+                <Route path="vehicles/duplicates" element={<Duplicates />} />
+                <Route path="vehicles/reports/payment-methods" element={<PaymentMethodsReport />} />
+
+                {/* Placeholder depts */}
+                <Route path="finance" element={<Finance />} />
+                <Route path="employees" element={<Employees />} />
+                <Route path="*" element={<Navigate to="/dept/vehicles/dashboard" replace />} />
+              </Routes>
+            </Layout>
+          </PrivateRoute>
+        } />
+
+        {/* Old protected routes (keep for backward compat) */}
         <Route path="/*" element={
           <PrivateRoute>
             <Layout>
               <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/vehicles" element={<Vehicles />} />
-                <Route path="/vehicles/:id" element={<VehicleDetail />} />
-                <Route path="/maintenance" element={<Maintenance />} />
-                <Route path="/inspections" element={<Inspections />} />
-                <Route path="/insurance" element={<Insurance />} />
-                <Route path="/fuel" element={<Fuel />} />
-                <Route path="/employees" element={<Employees />} />
-                <Route path="/tools" element={<Tools />} />
-                <Route path="/finance" element={<Finance />} />
-                <Route path="/operator-license" element={<OperatorLicense />} />
+                <Route path="employees" element={<Employees />} />
+                <Route path="finance" element={<Finance />} />
+                <Route path="*" element={<Navigate to="/dept/vehicles/dashboard" replace />} />
               </Routes>
             </Layout>
           </PrivateRoute>
@@ -194,4 +177,9 @@ export default function App() {
       </Routes>
     </BrowserRouter>
   );
+}
+
+function LegacyVehicleRedirect() {
+  const { id } = useParams();
+  return <Navigate to={`/dept/vehicles/${id}/overview`} replace />;
 }

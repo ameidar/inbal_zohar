@@ -15,6 +15,19 @@ async function req(method, path, body) {
   return data;
 }
 
+async function reqForm(method, path, formData) {
+  const opts = {
+    method,
+    headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) },
+    body: formData
+  };
+  const res = await fetch(BASE + path, opts);
+  if (res.status === 401) { localStorage.removeItem('fleet_token'); window.location.href = '/login'; }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Error');
+  return data;
+}
+
 export const api = {
   get: (p) => req('GET', p),
   post: (p, b) => req('POST', p, b),
@@ -84,9 +97,55 @@ export const api = {
   // Finance
   financeMonthly: (year, month) => req('GET', `/dashboard/monthly?year=${year}&month=${month}`),
 
-  // Operator Licenses
+  // Operator Licenses (legacy CRUD)
   operatorLicenses: () => req('GET', '/operator-licenses'),
   createOperatorLicense: (d) => req('POST', '/operator-licenses', d),
   updateOperatorLicense: (id, d) => req('PUT', `/operator-licenses/${id}`, d),
   deleteOperatorLicense: (id) => req('DELETE', `/operator-licenses/${id}`),
+
+  // ---- NEW SPEC API ----
+
+  // Payment Methods (new spec, uses /api/payment-methods)
+  getPaymentMethods: () => req('GET', '/payment-methods'),
+  updatePaymentMethod: (id, d) => req('PUT', `/payment-methods/${id}`, d),
+  deletePaymentMethod: (id) => req('DELETE', `/payment-methods/${id}`),
+
+  // Payment Schedule
+  getPaymentSchedule: (params = '') => req('GET', `/payment-schedule${params}`),
+  getPaymentScheduleSummary: () => req('GET', '/payment-schedule/summary'),
+  createPaymentScheduleItem: (d) => req('POST', '/payment-schedule', d),
+  updatePaymentScheduleItem: (id, d) => req('PUT', `/payment-schedule/${id}`, d),
+  deletePaymentScheduleItem: (id) => req('DELETE', `/payment-schedule/${id}`),
+
+  // Documents
+  getDocuments: (entityType = '', entityId = '') => {
+    const params = new URLSearchParams();
+    if (entityType) params.set('linkedEntityType', entityType);
+    if (entityId) params.set('linkedEntityId', entityId);
+    const qs = params.toString();
+    return req('GET', `/documents${qs ? '?' + qs : ''}`);
+  },
+  uploadDocument: (formData) => reqForm('POST', '/documents', formData),
+  deleteDocument: (id) => req('DELETE', `/documents/${id}`),
+
+  // Tool Categories
+  getToolCategories: () => req('GET', '/tool-categories'),
+  createToolCategory: (d) => req('POST', '/tool-categories', d),
+  updateToolCategory: (id, d) => req('PUT', `/tool-categories/${id}`, d),
+  deleteToolCategory: (id) => req('DELETE', `/tool-categories/${id}`),
+
+  // Operator License (new spec, uses /api/operator-license singular)
+  getOperatorLicenses: () => req('GET', '/operator-license'),
+  createOperatorLicenseNew: (d) => req('POST', '/operator-license', d),
+  updateOperatorLicenseNew: (id, d) => req('PUT', `/operator-license/${id}`, d),
+  deleteOperatorLicenseNew: (id) => req('DELETE', `/operator-license/${id}`),
+
+  // Duplicates
+  getDuplicateVehicles: () => req('GET', '/duplicates/vehicles'),
+  getDuplicatePolicies: () => req('GET', '/duplicates/policies'),
+  mergeVehicles: (primaryId, secondaryId, overrides = {}) => req('POST', '/duplicates/merge/vehicles', { primary_id: primaryId, secondary_id: secondaryId, field_overrides: overrides }),
+  mergePolicies: (primaryId, secondaryId, overrides = {}) => req('POST', '/duplicates/merge/policies', { primary_id: primaryId, secondary_id: secondaryId, field_overrides: overrides }),
+
+  // Missing Data
+  getMissingData: (vehicleId) => req('GET', `/vehicles/${vehicleId}/missing-data`),
 };
