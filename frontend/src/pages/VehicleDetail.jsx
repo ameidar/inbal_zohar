@@ -141,9 +141,9 @@ export default function VehicleDetail() {
   function calcFirstChargeDate(startDateStr, pm) {
     if (!startDateStr) return null;
     const d = new Date(startDateStr);
-    const isAuto = pm && pm.charge_day && (pm.payment_type === 'אשראי' || (pm.payment_type && pm.payment_type.includes('הו')));
+    const isAuto = pm && pm.monthly_charge_day && (pm.payment_type === 'אשראי' || (pm.payment_type && pm.payment_type.includes('הו')));
     if (isAuto) {
-      const cDay = parseInt(pm.charge_day);
+      const cDay = parseInt(pm.monthly_charge_day);
       let year = d.getFullYear(), month = d.getMonth();
       if (d.getDate() >= cDay) { month += 1; if (month > 11) { month = 0; year += 1; } }
       const dim = new Date(year, month + 1, 0).getDate();
@@ -899,7 +899,7 @@ export default function VehicleDetail() {
                   setInsScheduleItems(buildAutoSchedule({...insuranceForm, charge_method_id: pmId}, pmId, pm));
                 }}>
                 <option value="">בחר אמצעי תשלום</option>
-                {paymentMethods.map(pm=><option key={pm.id} value={pm.id}>{pm.name}{pm.charge_day?` (יום ${pm.charge_day})`:''}</option>)}
+                {paymentMethods.map(pm=><option key={pm.id} value={pm.id}>{pm.name}{pm.monthly_charge_day?` (יום ${pm.monthly_charge_day})`:''}</option>)}
               </select>
               <button className="btn btn-secondary btn-sm" type="button" onClick={()=>{setShowAddPM(true);setNewPMForm({});}} title="הוסף אמצעי תשלום חדש">+ חדש</button>
             </div>
@@ -907,10 +907,10 @@ export default function VehicleDetail() {
               const pm = paymentMethods.find(p => p.id === insuranceForm.charge_method_id);
               const firstDate = calcFirstChargeDate(insuranceForm.start_date || new Date().toISOString().split('T')[0], pm);
               if (!pm || !firstDate) return null;
-              const isAuto = pm.charge_day && (pm.payment_type === 'אשראי' || (pm.payment_type && pm.payment_type.includes('הו')));
+              const isAuto = pm.monthly_charge_day && (pm.payment_type === 'אשראי' || (pm.payment_type && pm.payment_type.includes('הו')));
               return (
                 <div style={{fontSize:12, color: isAuto ? '#0369a1' : '#64748b', marginTop:4, fontWeight:600}}>
-                  📅 {isAuto ? `חיוב ראשון מחושב: ${new Date(firstDate).toLocaleDateString('he-IL')} (יום ${pm.charge_day} לחודש)` : `חיוב ראשון: ${new Date(firstDate).toLocaleDateString('he-IL')}`}
+                  📅 {isAuto ? `חיוב ראשון מחושב: ${new Date(firstDate).toLocaleDateString('he-IL')} (יום ${pm.monthly_charge_day} לחודש)` : `חיוב ראשון: ${new Date(firstDate).toLocaleDateString('he-IL')}`}
                 </div>
               );
             })()}

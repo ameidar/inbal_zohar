@@ -79,9 +79,9 @@ export default function Insurance() {
   function calcFirstChargeDate(startDateStr, pm) {
     if (!startDateStr) return null;
     const d = new Date(startDateStr);
-    const isAutoCharge = pm && pm.charge_day && (pm.payment_type === 'אשראי' || (pm.payment_type && pm.payment_type.includes('הו')));
+    const isAutoCharge = pm && pm.monthly_charge_day && (pm.payment_type === 'אשראי' || (pm.payment_type && pm.payment_type.includes('הו')));
     if (isAutoCharge) {
-      const chargeDay = parseInt(pm.charge_day);
+      const chargeDay = parseInt(pm.monthly_charge_day);
       let year = d.getFullYear(), month = d.getMonth();
       if (d.getDate() >= chargeDay) { month += 1; if (month > 11) { month = 0; year += 1; } }
       const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -178,10 +178,10 @@ export default function Insurance() {
 
   // Smart first charge date display
   const selectedPM = paymentMethods.find(pm => pm.id === (form.charge_method_id));
-  const isAutoChargeDay = selectedPM && selectedPM.charge_day && (selectedPM.payment_type === 'אשראי' || (selectedPM.payment_type && selectedPM.payment_type.includes('הו')));
+  const isAutoChargeDay = selectedPM && selectedPM.monthly_charge_day && (selectedPM.payment_type === 'אשראי' || (selectedPM.payment_type && selectedPM.payment_type.includes('הו')));
   const computedFirstCharge = calcFirstChargeDate(form.start_date || new Date().toISOString().split('T')[0], selectedPM);
   const firstChargeLabel = isAutoChargeDay
-    ? `חיוב ראשון מחושב: ${computedFirstCharge ? new Date(computedFirstCharge).toLocaleDateString('he-IL') : '—'} (יום ${selectedPM.charge_day} לחודש)`
+    ? `חיוב ראשון מחושב: ${computedFirstCharge ? new Date(computedFirstCharge).toLocaleDateString('he-IL') : '—'} (יום ${selectedPM.monthly_charge_day} לחודש)`
     : null;
 
   return (
@@ -423,7 +423,7 @@ export default function Insurance() {
                     setScheduleItems(buildAutoSchedule({...form, charge_method_id: pmId}, pmId, pm));
                   }}>
                     <option value="">בחר אמצעי תשלום</option>
-                    {paymentMethods.map(pm=><option key={pm.id} value={pm.id}>{pm.name}{pm.charge_day ? ` (יום ${pm.charge_day})` : ''}</option>)}
+                    {paymentMethods.map(pm=><option key={pm.id} value={pm.id}>{pm.name}{pm.monthly_charge_day ? ` (יום ${pm.monthly_charge_day})` : ''}</option>)}
                   </select>
                   {firstChargeLabel && (
                     <div style={{fontSize:12, color:'#0369a1', marginTop:4, fontWeight:600}}>
