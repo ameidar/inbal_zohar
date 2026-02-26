@@ -84,9 +84,29 @@ export default function VehicleDetail() {
   const [dieselForm, setDieselForm] = useState({});
   const [dieselSaving, setDieselSaving] = useState(false);
 
+  const [paymentMethods, setPaymentMethods] = useState([]);
+  const [showAddPM, setShowAddPM] = useState(false);
+  const [newPMForm, setNewPMForm] = useState({});
+  const [savingPM, setSavingPM] = useState(false);
+
   useEffect(() => { api.vehicle(id).then(setVehicle).catch(console.error); }, [id]);
+  useEffect(() => { api.paymentMethods().then(setPaymentMethods).catch(()=>{}); }, []);
 
   function reload() { api.vehicle(id).then(setVehicle).catch(console.error); }
+
+  async function saveNewPM() {
+    if (!newPMForm.name) return alert('חובה להזין שם');
+    setSavingPM(true);
+    try {
+      const created = await api.createPaymentMethod(newPMForm);
+      const updated = await api.paymentMethods();
+      setPaymentMethods(updated);
+      setInsuranceForm(f => ({ ...f, charge_method_id: created.id }));
+      setShowAddPM(false);
+      setNewPMForm({});
+    } catch(e) { alert(e.message); }
+    finally { setSavingPM(false); }
+  }
 
   // ── Purchase handlers ──
   function openPurchaseEdit() {
@@ -144,6 +164,7 @@ export default function VehicleDetail() {
       first_charge_day: p.first_charge_day || 1,
       status: p.status || 'פעילה',
       notes: p.notes || '',
+      charge_method_id: p.charge_method_id || null,
     });
     setShowInsuranceModal(true);
   }
@@ -737,6 +758,35 @@ export default function VehicleDetail() {
           <div className="form-row">
             <Field label="יום חיוב חודשי">{inp(insuranceForm, setInsuranceForm, 'first_charge_day', 'number', {min:1,max:28})}</Field>
           </div>
+          <Field label="אמצעי תשלום">
+            <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+              <select className="form-control" style={{flex:1}}
+                value={insuranceForm.charge_method_id||''}
+                onChange={e=>setInsuranceForm(f=>({...f,charge_method_id:+e.target.value||null}))}>
+                <option value="">בחר אמצעי תשלום</option>
+                {paymentMethods.map(pm=><option key={pm.id} value={pm.id}>{pm.name}</option>)}
+              </select>
+              <button className="btn btn-secondary btn-sm" type="button" onClick={()=>{setShowAddPM(true);setNewPMForm({});}} title="הוסף אמצעי תשלום חדש">+ חדש</button>
+            </div>
+            {showAddPM && (
+              <div style={{marginTop:10,padding:12,background:'#f8fafc',border:'1px solid #e2e8f0',borderRadius:8}}>
+                <div style={{fontWeight:600,marginBottom:8,fontSize:13}}>➕ הוספת אמצעי תשלום חדש</div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
+                  <input className="form-control" placeholder="שם (חובה)" value={newPMForm.name||''} onChange={e=>setNewPMForm(f=>({...f,name:e.target.value}))}/>
+                  <select className="form-control" value={newPMForm.payment_type||''} onChange={e=>setNewPMForm(f=>({...f,payment_type:e.target.value}))}>
+                    <option value="">סוג</option>
+                    {['אשראי','העברה בנקאית',"הו\"\"ק",'צ\'ק','מזומן'].map(t=><option key={t} value={t}>{t}</option>)}
+                  </select>
+                  <input className="form-control" placeholder="4 ספרות אחרונות (לאשראי)" maxLength={4} value={newPMForm.last_4_digits||''} onChange={e=>setNewPMForm(f=>({...f,last_4_digits:e.target.value}))}/>
+                  <input className="form-control" placeholder="חברה / בנק" value={newPMForm.company||''} onChange={e=>setNewPMForm(f=>({...f,company:e.target.value}))}/>
+                </div>
+                <div style={{display:'flex',gap:8}}>
+                  <button className="btn btn-primary btn-sm" onClick={saveNewPM} disabled={savingPM}>{savingPM?'שומר...':'שמור'}</button>
+                  <button className="btn btn-secondary btn-sm" onClick={()=>setShowAddPM(false)}>ביטול</button>
+                </div>
+              </div>
+            )}
+          </Field>
           <Field label="הערות">
             <textarea className="form-control" rows={2} value={insuranceForm.notes||''} onChange={e=>setInsuranceForm(f=>({...f,notes:e.target.value}))}/>
           </Field>
