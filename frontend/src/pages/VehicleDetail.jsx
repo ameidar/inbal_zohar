@@ -138,19 +138,31 @@ export default function VehicleDetail() {
   }
 
   // ── Schedule helpers ──
+  function calcFirstChargeDate(startDateStr, pm) {
+    if (!startDateStr) return null;
+    const d = new Date(startDateStr);
+    const isAuto = pm && pm.charge_day && (pm.payment_type === 'אשראי' || (pm.payment_type && pm.payment_type.includes('הו')));
+    if (isAuto) {
+      const cDay = parseInt(pm.charge_day);
+      let year = d.getFullYear(), month = d.getMonth();
+      if (d.getDate() >= cDay) { month += 1; if (month > 11) { month = 0; year += 1; } }
+      const dim = new Date(year, month + 1, 0).getDate();
+      return `${year}-${String(month+1).padStart(2,'0')}-${String(Math.min(cDay,dim)).padStart(2,'0')}`;
+    }
+    return d.toISOString().split('T')[0];
+  }
+
   function buildAutoSchedule(formData, pmId) {
     const total = parseFloat(formData.total_premium) || 0;
     const count = parseInt(formData.num_payments) || 1;
-    const chargeDay = parseInt(formData.first_charge_day) || 1;
-    const startDate = formData.start_date ? new Date(formData.start_date) : null;
+    const pm = paymentMethods.find(p => p.id === (pmId || formData.charge_method_id));
+    const firstDate = calcFirstChargeDate(formData.start_date || new Date().toISOString().split('T')[0], pm);
     const perInstallment = count > 0 ? (total / count) : total;
     return Array.from({ length: count }, (_, i) => {
-      let chargeDate = null;
-      let chargeMonth = null;
-      if (startDate) {
-        const d = new Date(startDate);
+      let chargeDate = null, chargeMonth = null;
+      if (firstDate) {
+        const d = new Date(firstDate);
         d.setMonth(d.getMonth() + i);
-        d.setDate(Math.min(chargeDay, new Date(d.getFullYear(), d.getMonth()+1, 0).getDate()));
         chargeDate = d.toISOString().split('T')[0];
         chargeMonth = chargeDate.substring(0, 7);
       }
@@ -857,28 +869,46 @@ export default function VehicleDetail() {
             <Field label="סטטוס">{sel(insuranceForm, setInsuranceForm, 'status', ['פעילה','בוטלה','בהקפאה'])}</Field>
           </div>
           <div className="form-row">
-            <Field label="תאריך התחלה">{inp(insuranceForm, setInsuranceForm, 'start_date', 'date')}</Field>
+            <Field label="תאריך התחלה">
+              <input className="form-control" type="date"
+                value={insuranceForm.start_date?.split('T')[0]||''}
+                onChange={e=>{
+                  const val = e.target.value;
+                  setInsuranceForm(f=>({...f, start_date: val}));
+                  setTimeout(() => setInsScheduleItems(buildAutoSchedule({...insuranceForm, start_date: val}, insuranceForm.charge_method_id)), 0);
+                }}/>
+            </Field>
             <Field label="תאריך סיום">{inp(insuranceForm, setInsuranceForm, 'expiry_date', 'date')}</Field>
           </div>
           <div className="form-row">
             <Field label="פרמיה כוללת (₪)">{inp(insuranceForm, setInsuranceForm, 'total_premium', 'number')}</Field>
             <Field label="מספר תשלומים">{inp(insuranceForm, setInsuranceForm, 'num_payments', 'number', {min:1})}</Field>
           </div>
-          {insShowChargeDay && (
-            <div className="form-row">
-              <Field label="יום חיוב חודשי">{inp(insuranceForm, setInsuranceForm, 'first_charge_day', 'number', {min:1,max:28})}</Field>
-            </div>
-          )}
           <Field label="אמצעי תשלום">
             <div style={{ display:'flex', gap:8, alignItems:'center' }}>
               <select className="form-control" style={{flex:1}}
                 value={insuranceForm.charge_method_id||''}
-                onChange={e=>setInsuranceForm(f=>({...f,charge_method_id:+e.target.value||null}))}>
+                onChange={e=>{
+                  const pmId = +e.target.value||null;
+                  setInsuranceForm(f=>({...f, charge_method_id: pmId}));
+                  setTimeout(() => setInsScheduleItems(buildAutoSchedule({...insuranceForm, charge_method_id: pmId}, pmId)), 0);
+                }}>
                 <option value="">בחר אמצעי תשלום</option>
-                {paymentMethods.map(pm=><option key={pm.id} value={pm.id}>{pm.name}</option>)}
+                {paymentMethods.map(pm=><option key={pm.id} value={pm.id}>{pm.name}{pm.charge_day?` (יום ${pm.charge_day})`:''}</option>)}
               </select>
               <button className="btn btn-secondary btn-sm" type="button" onClick={()=>{setShowAddPM(true);setNewPMForm({});}} title="הוסף אמצעי תשלום חדש">+ חדש</button>
             </div>
+            {(() => {
+              const pm = paymentMethods.find(p => p.id === insuranceForm.charge_method_id);
+              const firstDate = calcFirstChargeDate(insuranceForm.start_date || new Date().toISOString().split('T')[0], pm);
+              if (!pm || !firstDate) return null;
+              const isAuto = pm.charge_day && (pm.payment_type === 'אשראי' || (pm.payment_type && pm.payment_type.includes('הו')));
+              return (
+                <div style={{fontSize:12, color: isAuto ? '#0369a1' : '#64748b', marginTop:4, fontWeight:600}}>
+                  📅 {isAuto ? `חיוב ראשון מחושב: ${new Date(firstDate).toLocaleDateString('he-IL')} (יום ${pm.charge_day} לחודש)` : `חיוב ראשון: ${new Date(firstDate).toLocaleDateString('he-IL')}`}
+                </div>
+              );
+            })()}
             {showAddPM && (
               <div style={{marginTop:10,padding:12,background:'#f8fafc',border:'1px solid #e2e8f0',borderRadius:8}}>
                 <div style={{fontWeight:600,marginBottom:8,fontSize:13}}>➕ הוספת אמצעי תשלום חדש</div>

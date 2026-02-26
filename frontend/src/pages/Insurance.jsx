@@ -75,20 +75,34 @@ export default function Insurance() {
   function closeModal() { setShowModal(false); setEditItem(null); setForm({}); setScheduleItems([]); setShowSchedule(false); }
   const f = (k, val) => setForm(p => ({ ...p, [k]: val }));
 
+  // Calculate first charge date based on PM type
+  function calcFirstChargeDate(startDateStr, pm) {
+    if (!startDateStr) return null;
+    const d = new Date(startDateStr);
+    const isAutoCharge = pm && pm.charge_day && (pm.payment_type === 'אשראי' || (pm.payment_type && pm.payment_type.includes('הו')));
+    if (isAutoCharge) {
+      const chargeDay = parseInt(pm.charge_day);
+      let year = d.getFullYear(), month = d.getMonth();
+      if (d.getDate() >= chargeDay) { month += 1; if (month > 11) { month = 0; year += 1; } }
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      return `${year}-${String(month+1).padStart(2,'0')}-${String(Math.min(chargeDay, daysInMonth)).padStart(2,'0')}`;
+    }
+    return d.toISOString().split('T')[0];
+  }
+
   // Build auto schedule from form values
   function buildAutoSchedule(formData, pmId) {
     const total = parseFloat(formData.total_premium) || 0;
     const count = parseInt(formData.num_payments) || 1;
-    const chargeDay = parseInt(formData.first_charge_day) || 1;
-    const startDate = formData.start_date ? new Date(formData.start_date) : null;
+    const pm = paymentMethods.find(p => p.id === (pmId || formData.charge_method_id));
+    const firstDate = calcFirstChargeDate(formData.start_date || new Date().toISOString().split('T')[0], pm);
     const perInstallment = count > 0 ? (total / count) : total;
     return Array.from({ length: count }, (_, i) => {
       let chargeDate = null;
       let chargeMonth = null;
-      if (startDate) {
-        const d = new Date(startDate);
+      if (firstDate) {
+        const d = new Date(firstDate);
         d.setMonth(d.getMonth() + i);
-        d.setDate(Math.min(chargeDay, new Date(d.getFullYear(), d.getMonth()+1, 0).getDate()));
         chargeDate = d.toISOString().split('T')[0];
         chargeMonth = chargeDate.substring(0, 7);
       }
@@ -161,9 +175,13 @@ export default function Insurance() {
     return d.getFullYear() === thisYear && d.getMonth() === thisMonth;
   }).sort((a,b) => new Date(a.expiry_date) - new Date(b.expiry_date));
 
-  // Charge day visibility (depends on form.charge_method_id)
-  const selectedPM = paymentMethods.find(pm => pm.id === form.charge_method_id);
-  const showChargeDay = !selectedPM || selectedPM.payment_type === 'אשראי' || (selectedPM.payment_type && selectedPM.payment_type.includes('הו'));
+  // Smart first charge date display
+  const selectedPM = paymentMethods.find(pm => pm.id === (form.charge_method_id));
+  const isAutoChargeDay = selectedPM && selectedPM.charge_day && (selectedPM.payment_type === 'אשראי' || (selectedPM.payment_type && selectedPM.payment_type.includes('הו')));
+  const computedFirstCharge = calcFirstChargeDate(form.start_date || new Date().toISOString().split('T')[0], selectedPM);
+  const firstChargeLabel = isAutoChargeDay
+    ? `חיוב ראשון מחושב: ${computedFirstCharge ? new Date(computedFirstCharge).toLocaleDateString('he-IL') : '—'} (יום ${selectedPM.charge_day} לחודש)`
+    : null;
 
   return (
     <div>
@@ -378,20 +396,38 @@ export default function Insurance() {
                 </div>
               </div>
               <div className="form-row">
-                <div className="form-group"><label className="form-label">תחילת פוליסה</label><input className="form-control" type="date" value={form.start_date?.split('T')[0]||''} onChange={e=>f('start_date',e.target.value)}/></div>
+                <div className="form-group"><label className="form-label">תחילת פוליסה</label><input className="form-control" type="date" value={form.start_date?.split('T')[0]||''} onChange={e=>{
+                  f('start_date', e.target.value);
+                  setTimeout(() => setScheduleItems(buildAutoSchedule({...form, start_date: e.target.value}, form.charge_method_id)), 0);
+                }}/></div>
                 <div className="form-group"><label className="form-label">תפוגת פוליסה</label><input className="form-control" type="date" value={form.expiry_date?.split('T')[0]||''} onChange={e=>f('expiry_date',e.target.value)}/></div>
               </div>
-              <div className={`form-row ${showChargeDay ? 'cols-3' : 'cols-2'}`}>
+              <div className="form-row cols-2">
                 <div className="form-group"><label className="form-label">פרמיה כוללת (₪)</label><input className="form-control" type="number" value={form.total_premium ?? ''} onChange={e=>f('total_premium', e.target.value === '' ? '' : +e.target.value)}/></div>
                 <div className="form-group"><label className="form-label">מס' תשלומים</label><input className="form-control" type="number" value={form.num_payments ?? 12} onChange={e=>f('num_payments', e.target.value === '' ? '' : +e.target.value)}/></div>
-                {showChargeDay && <div className="form-group"><label className="form-label">יום חיוב בחודש</label><input className="form-control" type="number" min="1" max="28" value={form.first_charge_day ?? 1} onChange={e=>f('first_charge_day', e.target.value === '' ? '' : +e.target.value)}/></div>}
               </div>
               <div className="form-row">
-                <div className="form-group"><label className="form-label">אמצעי תשלום</label>
-                  <select className="form-control" value={form.charge_method_id||''} onChange={e=>f('charge_method_id',+e.target.value||null)}>
+                <div className="form-group">
+                  <label className="form-label">אמצעי תשלום</label>
+                  <select className="form-control" value={form.charge_method_id||''} onChange={e=>{
+                    const pmId = +e.target.value||null;
+                    f('charge_method_id', pmId);
+                    // Auto-rebuild schedule with new PM
+                    setTimeout(() => setScheduleItems(buildAutoSchedule({...form, charge_method_id: pmId}, pmId)), 0);
+                  }}>
                     <option value="">בחר אמצעי תשלום</option>
-                    {paymentMethods.map(pm=><option key={pm.id} value={pm.id}>{pm.name}</option>)}
+                    {paymentMethods.map(pm=><option key={pm.id} value={pm.id}>{pm.name}{pm.charge_day ? ` (יום ${pm.charge_day})` : ''}</option>)}
                   </select>
+                  {firstChargeLabel && (
+                    <div style={{fontSize:12, color:'#0369a1', marginTop:4, fontWeight:600}}>
+                      📅 {firstChargeLabel}
+                    </div>
+                  )}
+                  {!isAutoChargeDay && computedFirstCharge && form.charge_method_id && (
+                    <div style={{fontSize:12, color:'#64748b', marginTop:4}}>
+                      📅 חיוב ראשון: {new Date(computedFirstCharge).toLocaleDateString('he-IL')}
+                    </div>
+                  )}
                 </div>
                 <div className="form-group"><label className="form-label">סטטוס</label>
                   <select className="form-control" value={form.status||'פעילה'} onChange={e=>f('status',e.target.value)}>
