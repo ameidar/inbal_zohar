@@ -113,11 +113,11 @@ router.post('/', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { vehicle_id, tool_id, policy_number, coverage_type, insurer, start_date, expiry_date, purchase_date, total_premium, num_payments, first_charge_day, charge_method_id, status, notes } = req.body;
+    const { vehicle_id, tool_id, policy_number, policy_type, coverage_type, insurer, start_date, expiry_date, purchase_date, total_premium, num_payments, first_charge_day, charge_method_id, status, notes } = req.body;
     const r = await client.query(
-      `INSERT INTO insurance_policies (vehicle_id, tool_id, policy_number, coverage_type, insurer, start_date, expiry_date, purchase_date, total_premium, num_payments, first_charge_day, charge_method_id, status, notes)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
-      [vehicle_id, tool_id, policy_number, coverage_type, insurer, start_date||null, expiry_date||null, purchase_date||null, total_premium, num_payments||1, first_charge_day||1, charge_method_id, status||'פעילה', notes]
+      `INSERT INTO insurance_policies (vehicle_id, tool_id, policy_number, policy_type, coverage_type, insurer, start_date, expiry_date, purchase_date, total_premium, num_payments, first_charge_day, charge_method_id, status, notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+      [vehicle_id||null, tool_id||null, policy_number, policy_type||null, coverage_type, insurer, start_date||null, expiry_date||null, purchase_date||null, total_premium, num_payments||1, first_charge_day||1, charge_method_id||null, status||'פעילה', notes]
     );
     const policy = r.rows[0];
     await createPayments(client, policy.id);
@@ -130,7 +130,7 @@ router.put('/:id', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const fields = ['vehicle_id','tool_id','policy_number','coverage_type','insurer','start_date','expiry_date','purchase_date','total_premium','num_payments','first_charge_day','charge_method_id','status','notes'];
+    const fields = ['vehicle_id','tool_id','policy_number','policy_type','coverage_type','insurer','start_date','expiry_date','purchase_date','total_premium','num_payments','first_charge_day','charge_method_id','status','notes'];
     const data = req.body;
     const cols = fields.filter(f => data[f] !== undefined);
     if (!cols.length) return res.status(400).json({ error: 'No fields' });

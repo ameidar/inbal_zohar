@@ -303,7 +303,15 @@ export default function Insurance() {
                       )}
                       <tr style={{cursor:'pointer',background:selected?.id===p.id?'#eff6ff':'',opacity:isInactive?0.65:1}} onClick={()=>loadSelected(p.id)}>
                         <td style={{fontWeight:600}}>{p.policy_number}</td>
-                        <td style={{fontSize:12}}>{v?v.vehicle_number:'—'}</td>
+                        <td style={{fontSize:12}}>
+                          {v ? (
+                            <Link to={`/vehicles/${v.id}`} style={{color:'#1e40af',textDecoration:'none',fontWeight:600}}>
+                              {v.vehicle_number}{v.nickname?` (${v.nickname})`:''}
+                            </Link>
+                          ) : p.policy_type ? (
+                            <span style={{background:'#f3f4f6',color:'#374151',padding:'2px 8px',borderRadius:12,fontSize:11,fontWeight:600}}>🏢 {p.policy_type}</span>
+                          ) : <span style={{color:'#9ca3af'}}>—</span>}
+                        </td>
                         <td>{p.coverage_type}</td>
                         <td style={{fontSize:12}}>{p.insurer}</td>
                         <td style={{color:expiringSoon?'#dc2626':'',fontWeight:expiringSoon?700:''}}>{fmtDate(p.expiry_date)}{expiringSoon?' ⚠️':''}</td>
@@ -379,14 +387,20 @@ export default function Insurance() {
             </div>
             <div className="modal-body">
               <div className="form-row">
-                <div className="form-group"><label className="form-label">רכב</label>
+                <div className="form-group"><label className="form-label">רכב <span style={{fontSize:11,color:'#6b7280'}}>(אופציונלי)</span></label>
                   <select className="form-control" value={form.vehicle_id||''} onChange={e=>f('vehicle_id',+e.target.value||null)}>
-                    <option value="">בחר רכב</option>
+                    <option value="">ללא רכב (פוליסה עצמאית)</option>
                     {vehicles.map(v=><option key={v.id} value={v.id}>{v.vehicle_number} {v.nickname?`(${v.nickname})`:''}</option>)}
                   </select>
                 </div>
                 <div className="form-group"><label className="form-label">מספר פוליסה</label><input className="form-control" value={form.policy_number||''} onChange={e=>f('policy_number',e.target.value)}/></div>
               </div>
+              {!form.vehicle_id && (
+                <div className="form-group">
+                  <label className="form-label">סוג פוליסה <span style={{fontSize:11,color:'#6b7280'}}>(למשל: פוליסת קבלנים, ביטוח עסק, אחריות מקצועית)</span></label>
+                  <input className="form-control" placeholder="הזן סוג פוליסה..." value={form.policy_type||''} onChange={e=>f('policy_type',e.target.value)}/>
+                </div>
+              )}
               <div className="form-row">
                 <div className="form-group"><label className="form-label">סוג כיסוי</label>
                   <select className="form-control" value={form.coverage_type||''} onChange={e=>f('coverage_type',e.target.value)}>
