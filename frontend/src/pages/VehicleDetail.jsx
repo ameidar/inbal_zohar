@@ -49,6 +49,33 @@ export default function VehicleDetail() {
   const [insuranceSaving, setInsuranceSaving] = useState(false);
   const [insScheduleItems, setInsScheduleItems] = useState([]);
   const [showInsSchedule, setShowInsSchedule] = useState(false);
+  const [insSort, setInsSort] = useState({ col: 'status', dir: 'asc' });
+
+  function toggleInsSort(col) {
+    setInsSort(s => ({ col, dir: s.col === col && s.dir === 'asc' ? 'desc' : 'asc' }));
+  }
+
+  function sortedPolicies(policies) {
+    if (!policies) return [];
+    const active = ['פעילה'];
+    const inactive = ['הסתיימה', 'בוטלה', 'לא פעילה', 'בהקפאה'];
+    const statusOrder = p => active.includes(p.status) ? 0 : inactive.includes(p.status) ? 2 : 1;
+    return [...policies].sort((a, b) => {
+      // Always: active first, then others
+      const statusDiff = statusOrder(a) - statusOrder(b);
+      if (statusDiff !== 0) return statusDiff;
+      // Within same status group: sort by selected col
+      const dir = insSort.dir === 'asc' ? 1 : -1;
+      if (insSort.col === 'expiry_date') {
+        return dir * (new Date(a.expiry_date||0) - new Date(b.expiry_date||0));
+      }
+      if (insSort.col === 'total_premium') {
+        return dir * ((parseFloat(a.total_premium)||0) - (parseFloat(b.total_premium)||0));
+      }
+      const av = a[insSort.col] || '', bv = b[insSort.col] || '';
+      return dir * av.toString().localeCompare(bv.toString(), 'he');
+    });
+  }
 
   // ── Maintenance modal ──
   const [showMaintenanceModal, setShowMaintenanceModal] = useState(false);
@@ -440,7 +467,7 @@ export default function VehicleDetail() {
 
   const statusBadge = (s) => {
     const map = { 'פעיל':'badge-green','בוצע':'badge-green','שולם':'badge-green','פעילה':'badge-green',
-                  'מושבת':'badge-red','בוטל':'badge-red','לא פעיל':'badge-red','בוטלה':'badge-red',
+                  'מושבת':'badge-red','בוטל':'badge-red','לא פעיל':'badge-red','בוטלה':'badge-red','הסתיימה':'badge-gray',
                   'בהקפאה':'badge-yellow','בתיקון':'badge-yellow','שולם באיחור':'badge-yellow',
                   'פתוח':'badge-blue','התקבל':'badge-green','הוגש':'badge-yellow' };
     return <span className={`badge ${map[s]||'badge-gray'}`}>{s}</span>;
@@ -764,21 +791,50 @@ export default function VehicleDetail() {
           </div>
           <div className="table-wrap">
             <table>
-              <thead><tr><th>מספר פוליסה</th><th>סוג כיסוי</th><th>מבטח</th><th>מתאריך</th><th>עד תאריך</th><th>פרמיה כוללת</th><th>תשלומים</th><th>סטטוס</th>{isAdmin && <th></th>}</tr></thead>
+              <thead>
+                <tr>
+                  {[
+                    { col:'policy_number', label:'מספר פוליסה' },
+                    { col:'coverage_type', label:'סוג כיסוי' },
+                    { col:'insurer', label:'מבטח' },
+                    { col:'start_date', label:'מתאריך' },
+                    { col:'expiry_date', label:'עד תאריך' },
+                    { col:'total_premium', label:'פרמיה כוללת' },
+                    { col:'num_payments', label:'תשלומים' },
+                    { col:'status', label:'סטטוס' },
+                  ].map(({col, label}) => (
+                    <th key={col} style={{cursor:'pointer', userSelect:'none', whiteSpace:'nowrap'}}
+                      onClick={() => toggleInsSort(col)}>
+                      {label} {insSort.col===col ? (insSort.dir==='asc'?'↑':'↓') : ''}
+                    </th>
+                  ))}
+                  {isAdmin && <th></th>}
+                </tr>
+              </thead>
               <tbody>
-                {vehicle.policies?.map(p=>(
-                  <tr key={p.id}>
-                    <td style={{fontWeight:600}}>{p.policy_number}</td>
-                    <td>{p.coverage_type}</td>
-                    <td>{p.insurer}</td>
-                    <td>{fmtDate(p.start_date)}</td>
-                    <td style={{color: p.expiry_date && new Date(p.expiry_date)<new Date(Date.now()+30*86400000)?'#dc2626':''}}>{fmtDate(p.expiry_date)}</td>
-                    <td>{fmtCur(p.total_premium)}</td>
-                    <td>{p.num_payments}</td>
-                    <td>{statusBadge(p.status)}</td>
-                    {isAdmin && <td><button className="btn btn-secondary btn-sm" onClick={()=>openEditInsurance(p)}>✏️</button></td>}
-                  </tr>
-                ))}
+                {sortedPolicies(vehicle.policies).map((p, idx, arr) => {
+                  const isInactive = ['הסתיימה','בוטלה','לא פעילה','בהקפאה'].includes(p.status);
+                  const prevInactive = idx > 0 && ['הסתיימה','בוטלה','לא פעילה','בהקפאה'].includes(arr[idx-1]?.status);
+                  const firstInactive = isInactive && !prevInactive;
+                  return (
+                    <React.Fragment key={p.id}>
+                      {firstInactive && (
+                        <tr><td colSpan={isAdmin?9:8} style={{background:'#f1f5f9',padding:'4px 12px',fontSize:11,color:'#64748b',fontWeight:600}}>— פוליסות לא פעילות —</td></tr>
+                      )}
+                      <tr style={{opacity: isInactive ? 0.6 : 1, background: isInactive ? '#fafafa' : ''}}>
+                        <td style={{fontWeight:600}}>{p.policy_number}</td>
+                        <td>{p.coverage_type}</td>
+                        <td>{p.insurer}</td>
+                        <td>{fmtDate(p.start_date)}</td>
+                        <td style={{color: !isInactive && p.expiry_date && new Date(p.expiry_date)<new Date(Date.now()+30*86400000)?'#dc2626':''}}>{fmtDate(p.expiry_date)}</td>
+                        <td>{fmtCur(p.total_premium)}</td>
+                        <td>{p.num_payments}</td>
+                        <td>{statusBadge(p.status)}</td>
+                        {isAdmin && <td><button className="btn btn-secondary btn-sm" onClick={()=>openEditInsurance(p)}>✏️</button></td>}
+                      </tr>
+                    </React.Fragment>
+                  );
+                })}
                 {!vehicle.policies?.length && <tr><td colSpan={isAdmin?9:8} style={{textAlign:'center',color:'#9ca3af',padding:20}}>אין פוליסות</td></tr>}
               </tbody>
             </table>

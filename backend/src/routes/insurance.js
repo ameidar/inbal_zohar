@@ -25,6 +25,8 @@ async function createPayments(client, policyId) {
 // List policies with vehicle info
 router.get('/', async (req, res) => {
   try {
+    // Auto-expire: mark policies past expiry_date as "הסתיימה"
+    await pool.query(`UPDATE insurance_policies SET status='הסתיימה' WHERE expiry_date < CURRENT_DATE AND status='פעילה'`).catch(()=>{});
     const { vehicle_id, status } = req.query;
     let where = [];
     let params = [];

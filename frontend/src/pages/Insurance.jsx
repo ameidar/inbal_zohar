@@ -17,6 +17,22 @@ export default function Insurance() {
   const [saving, setSaving] = useState(false);
   const [scheduleItems, setScheduleItems] = useState([]);
   const [showSchedule, setShowSchedule] = useState(false);
+  const [sort, setSort] = useState({ col: 'status', dir: 'asc' });
+
+  function toggleSort(col) { setSort(s => ({ col, dir: s.col===col && s.dir==='asc' ? 'desc' : 'asc' })); }
+
+  function sortedPolicies() {
+    const active = ['פעילה'], inactive = ['הסתיימה','בוטלה','לא פעילה','בהקפאה'];
+    const order = p => active.includes(p.status) ? 0 : inactive.includes(p.status) ? 2 : 1;
+    return [...policies].sort((a, b) => {
+      const sd = order(a) - order(b);
+      if (sd !== 0) return sd;
+      const dir = sort.dir === 'asc' ? 1 : -1;
+      if (sort.col === 'expiry_date' || sort.col === 'start_date') return dir*(new Date(a[sort.col]||0)-new Date(b[sort.col]||0));
+      if (sort.col === 'total_premium') return dir*((parseFloat(a.total_premium)||0)-(parseFloat(b.total_premium)||0));
+      return dir*(a[sort.col]||'').toString().localeCompare((b[sort.col]||'').toString(),'he');
+    });
+  }
   const user = JSON.parse(localStorage.getItem('fleet_user') || '{}');
 
   async function load() {
@@ -228,38 +244,67 @@ export default function Insurance() {
           <div className="card-header"><span className="card-title">פוליסות</span></div>
           <div className="table-wrap">
             <table>
-              <thead><tr><th>מס' פוליסה</th><th>רכב</th><th>כיסוי</th><th>מבטח</th><th>עד תאריך</th><th>פרמיה</th><th>חודשי</th><th>אמצעי תשלום</th><th>סטטוס</th><th>באיחור</th><th></th></tr></thead>
+              <thead>
+                <tr>
+                  {[
+                    {col:'policy_number',label:"מס' פוליסה"},
+                    {col:'vehicle_id',label:'רכב'},
+                    {col:'coverage_type',label:'כיסוי'},
+                    {col:'insurer',label:'מבטח'},
+                    {col:'expiry_date',label:'עד תאריך'},
+                    {col:'total_premium',label:'פרמיה'},
+                    {col:'monthly',label:'חודשי',noSort:true},
+                    {col:'charge_method_id',label:'אמצעי תשלום'},
+                    {col:'status',label:'סטטוס'},
+                    {col:'overdue',label:'באיחור',noSort:true},
+                  ].map(({col,label,noSort})=>(
+                    <th key={col} style={{cursor:noSort?'default':'pointer',userSelect:'none',whiteSpace:'nowrap'}}
+                      onClick={noSort?undefined:()=>toggleSort(col)}>
+                      {label}{!noSort && sort.col===col?(sort.dir==='asc'?' ↑':' ↓'):''}
+                    </th>
+                  ))}
+                  <th></th>
+                </tr>
+              </thead>
               <tbody>
-                {policies.map(p=>{
+                {sortedPolicies().map((p, idx, arr)=>{
+                  const isInactive = ['הסתיימה','בוטלה','לא פעילה','בהקפאה'].includes(p.status);
+                  const prevInactive = idx > 0 && ['הסתיימה','בוטלה','לא פעילה','בהקפאה'].includes(arr[idx-1]?.status);
+                  const firstInactive = isInactive && !prevInactive;
                   const v = vMap[p.vehicle_id];
-                  const expiringSoon = p.expiry_date && new Date(p.expiry_date) < new Date(Date.now()+30*86400000);
+                  const expiringSoon = !isInactive && p.expiry_date && new Date(p.expiry_date) < new Date(Date.now()+30*86400000);
                   return (
-                    <tr key={p.id} style={{cursor:'pointer',background:selected?.id===p.id?'#eff6ff':''}} onClick={()=>loadSelected(p.id)}>
-                      <td style={{fontWeight:600}}>{p.policy_number}</td>
-                      <td style={{fontSize:12}}>{v?v.vehicle_number:'—'}</td>
-                      <td>{p.coverage_type}</td>
-                      <td style={{fontSize:12}}>{p.insurer}</td>
-                      <td style={{color:expiringSoon?'#dc2626':'',fontWeight:expiringSoon?700:''}}>{fmtDate(p.expiry_date)}{expiringSoon?' ⚠️':''}</td>
-                      <td>{fmtCur(p.total_premium)}</td>
-                      <td style={{fontSize:12,color:'#0369a1',fontWeight:600}}>
-                        {p.total_premium && p.num_payments ? `₪${Math.round(parseFloat(p.total_premium)/parseInt(p.num_payments)).toLocaleString('he-IL')}` : '—'}
-                      </td>
-                      <td style={{fontSize:12}}>
-                        {pmMap[p.charge_method_id] ? (
-                          <span style={{background:'#e0f2fe',color:'#0369a1',padding:'2px 8px',borderRadius:12,fontWeight:600}}>
-                            {pmMap[p.charge_method_id].name}
-                          </span>
-                        ) : <span style={{color:'#9ca3af'}}>—</span>}
-                      </td>
-                      <td><span className={`badge ${p.status==='פעילה'?'badge-green':p.status==='בוטלה'?'badge-red':'badge-gray'}`}>{p.status}</span></td>
-                      <td>{p.overdue_count > 0 ? <span className="badge badge-red">{p.overdue_count} 🔴</span> : <span className="badge badge-green">תקין</span>}</td>
-                      <td onClick={e=>e.stopPropagation()}>
-                        {user.role==='admin' && <>
-                          <button className="btn btn-secondary btn-sm" onClick={()=>openEdit(p)} style={{marginLeft:4}}>✏️</button>
-                          <button className="btn btn-danger btn-sm" onClick={()=>del(p)}>🗑️</button>
-                        </>}
-                      </td>
-                    </tr>
+                    <React.Fragment key={p.id}>
+                      {firstInactive && (
+                        <tr><td colSpan={11} style={{background:'#f1f5f9',padding:'4px 12px',fontSize:11,color:'#64748b',fontWeight:600}}>— פוליסות לא פעילות —</td></tr>
+                      )}
+                      <tr style={{cursor:'pointer',background:selected?.id===p.id?'#eff6ff':'',opacity:isInactive?0.65:1}} onClick={()=>loadSelected(p.id)}>
+                        <td style={{fontWeight:600}}>{p.policy_number}</td>
+                        <td style={{fontSize:12}}>{v?v.vehicle_number:'—'}</td>
+                        <td>{p.coverage_type}</td>
+                        <td style={{fontSize:12}}>{p.insurer}</td>
+                        <td style={{color:expiringSoon?'#dc2626':'',fontWeight:expiringSoon?700:''}}>{fmtDate(p.expiry_date)}{expiringSoon?' ⚠️':''}</td>
+                        <td>{fmtCur(p.total_premium)}</td>
+                        <td style={{fontSize:12,color:'#0369a1',fontWeight:600}}>
+                          {p.total_premium && p.num_payments ? `₪${Math.round(parseFloat(p.total_premium)/parseInt(p.num_payments)).toLocaleString('he-IL')}` : '—'}
+                        </td>
+                        <td style={{fontSize:12}}>
+                          {pmMap[p.charge_method_id] ? (
+                            <span style={{background:'#e0f2fe',color:'#0369a1',padding:'2px 8px',borderRadius:12,fontWeight:600}}>
+                              {pmMap[p.charge_method_id].name}
+                            </span>
+                          ) : <span style={{color:'#9ca3af'}}>—</span>}
+                        </td>
+                        <td><span className={`badge ${p.status==='פעילה'?'badge-green':p.status==='הסתיימה'||p.status==='בוטלה'?'badge-red':'badge-gray'}`}>{p.status}</span></td>
+                        <td>{p.overdue_count > 0 ? <span className="badge badge-red">{p.overdue_count} 🔴</span> : <span className="badge badge-green">תקין</span>}</td>
+                        <td onClick={e=>e.stopPropagation()}>
+                          {user.role==='admin' && <>
+                            <button className="btn btn-secondary btn-sm" onClick={()=>openEdit(p)} style={{marginLeft:4}}>✏️</button>
+                            <button className="btn btn-danger btn-sm" onClick={()=>del(p)}>🗑️</button>
+                          </>}
+                        </td>
+                      </tr>
+                    </React.Fragment>
                   );
                 })}
                 {policies.length===0 && <tr><td colSpan={11} style={{textAlign:'center',color:'#9ca3af',padding:20}}>אין פוליסות</td></tr>}
