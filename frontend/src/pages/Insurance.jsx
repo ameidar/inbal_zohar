@@ -15,6 +15,8 @@ export default function Insurance() {
   const [editItem, setEditItem] = useState(null);
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
+  const [scheduleItems, setScheduleItems] = useState([]);
+  const [showSchedule, setShowSchedule] = useState(false);
   const user = JSON.parse(localStorage.getItem('fleet_user') || '{}');
 
   async function load() {
@@ -31,16 +33,73 @@ export default function Insurance() {
   }
   useEffect(() => { load(); }, []);
 
-  function openAdd() { setEditItem(null); setForm({ status:'פעילה', coverage_type:'חובה', num_payments:12, first_charge_day:1 }); setShowModal(true); }
-  function openEdit(item) { setEditItem(item); setForm(item); setShowModal(true); }
-  function closeModal() { setShowModal(false); setEditItem(null); setForm({}); }
+  function openAdd() {
+    setEditItem(null);
+    const newForm = { status:'פעילה', coverage_type:'חובה', num_payments:12, first_charge_day:1 };
+    setForm(newForm);
+    setScheduleItems(buildAutoSchedule(newForm, null));
+    setShowSchedule(false);
+    setShowModal(true);
+  }
+  function openEdit(item) {
+    setEditItem(item);
+    setForm(item);
+    setShowSchedule(false);
+    if (item.id) {
+      api.policySchedule(item.id).then(items => {
+        setScheduleItems(items.length > 0 ? items : buildAutoSchedule(item, item.charge_method_id));
+      }).catch(() => {
+        setScheduleItems(buildAutoSchedule(item, item.charge_method_id));
+      });
+    } else {
+      setScheduleItems(buildAutoSchedule(item, item.charge_method_id));
+    }
+    setShowModal(true);
+  }
+  function closeModal() { setShowModal(false); setEditItem(null); setForm({}); setScheduleItems([]); setShowSchedule(false); }
   const f = (k, val) => setForm(p => ({ ...p, [k]: val }));
+
+  // Build auto schedule from form values
+  function buildAutoSchedule(formData, pmId) {
+    const total = parseFloat(formData.total_premium) || 0;
+    const count = parseInt(formData.num_payments) || 1;
+    const chargeDay = parseInt(formData.first_charge_day) || 1;
+    const startDate = formData.start_date ? new Date(formData.start_date) : null;
+    const perInstallment = count > 0 ? (total / count) : total;
+    return Array.from({ length: count }, (_, i) => {
+      let chargeDate = null;
+      let chargeMonth = null;
+      if (startDate) {
+        const d = new Date(startDate);
+        d.setMonth(d.getMonth() + i);
+        d.setDate(Math.min(chargeDay, new Date(d.getFullYear(), d.getMonth()+1, 0).getDate()));
+        chargeDate = d.toISOString().split('T')[0];
+        chargeMonth = chargeDate.substring(0, 7);
+      }
+      return {
+        installment_number: i + 1,
+        amount: Math.round(perInstallment * 100) / 100,
+        charge_date: chargeDate,
+        charge_month: chargeMonth,
+        payment_method_id: pmId || formData.charge_method_id || null,
+      };
+    });
+  }
 
   async function save() {
     setSaving(true);
     try {
-      if (editItem) await api.updatePolicy(editItem.id, form);
-      else await api.createPolicy(form);
+      let savedPolicy;
+      if (editItem) {
+        savedPolicy = await api.updatePolicy(editItem.id, form);
+      } else {
+        savedPolicy = await api.createPolicy(form);
+      }
+      // Save schedule items if any
+      const policyId = savedPolicy?.id || editItem?.id;
+      if (policyId && scheduleItems.length > 0) {
+        await api.bulkReplaceSchedule(policyId, scheduleItems).catch(()=>{});
+      }
       closeModal(); load(); if (selected) loadSelected(selected.id);
     } catch (e) { alert(e.message); }
     finally { setSaving(false); }
@@ -86,10 +145,18 @@ export default function Insurance() {
     return d.getFullYear() === thisYear && d.getMonth() === thisMonth;
   }).sort((a,b) => new Date(a.expiry_date) - new Date(b.expiry_date));
 
+  // Charge day visibility (depends on form.charge_method_id)
+  const selectedPM = paymentMethods.find(pm => pm.id === form.charge_method_id);
+  const showChargeDay = !selectedPM || selectedPM.payment_type === 'אשראי' || (selectedPM.payment_type && selectedPM.payment_type.includes('הו'));
+
   return (
     <div>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
-        <h2 style={{ fontSize:18, fontWeight:700 }}>ביטוח — {policies.length} פוליסות</h2>
+        <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+          <h2 style={{ fontSize:18, fontWeight:700 }}>ביטוח — {policies.length} פוליסות</h2>
+          <Link to="/dept/vehicles/policies/payments" style={{ fontSize:13, color:'#0369a1', fontWeight:600, padding:'4px 10px', background:'#e0f2fe', borderRadius:6, textDecoration:'none' }}>📊 לוח תשלומים</Link>
+          <Link to="/dept/vehicles/reports/payment-methods" style={{ fontSize:13, color:'#7c3aed', fontWeight:600, padding:'4px 10px', background:'#ede9fe', borderRadius:6, textDecoration:'none' }}>📈 דוח אמצעי תשלום</Link>
+        </div>
         {user.role==='admin' && <button className="btn btn-primary" onClick={openAdd}>+ הוסף פוליסה</button>}
       </div>
 
@@ -269,10 +336,10 @@ export default function Insurance() {
                 <div className="form-group"><label className="form-label">תחילת פוליסה</label><input className="form-control" type="date" value={form.start_date?.split('T')[0]||''} onChange={e=>f('start_date',e.target.value)}/></div>
                 <div className="form-group"><label className="form-label">תפוגת פוליסה</label><input className="form-control" type="date" value={form.expiry_date?.split('T')[0]||''} onChange={e=>f('expiry_date',e.target.value)}/></div>
               </div>
-              <div className="form-row cols-3">
+              <div className={`form-row ${showChargeDay ? 'cols-3' : 'cols-2'}`}>
                 <div className="form-group"><label className="form-label">פרמיה כוללת (₪)</label><input className="form-control" type="number" value={form.total_premium ?? ''} onChange={e=>f('total_premium', e.target.value === '' ? '' : +e.target.value)}/></div>
                 <div className="form-group"><label className="form-label">מס' תשלומים</label><input className="form-control" type="number" value={form.num_payments ?? 12} onChange={e=>f('num_payments', e.target.value === '' ? '' : +e.target.value)}/></div>
-                <div className="form-group"><label className="form-label">יום חיוב בחודש</label><input className="form-control" type="number" min="1" max="28" value={form.first_charge_day ?? 1} onChange={e=>f('first_charge_day', e.target.value === '' ? '' : +e.target.value)}/></div>
+                {showChargeDay && <div className="form-group"><label className="form-label">יום חיוב בחודש</label><input className="form-control" type="number" min="1" max="28" value={form.first_charge_day ?? 1} onChange={e=>f('first_charge_day', e.target.value === '' ? '' : +e.target.value)}/></div>}
               </div>
               <div className="form-row">
                 <div className="form-group"><label className="form-label">אמצעי תשלום</label>
@@ -286,6 +353,62 @@ export default function Insurance() {
                     {['פעילה','לא פעילה','בוטלה'].map(s=><option key={s}>{s}</option>)}
                   </select>
                 </div>
+              </div>
+              <div style={{ borderTop:'1px solid #e5e7eb', paddingTop:12, marginTop:4 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+                  <span style={{ fontWeight:700, fontSize:14 }}>📅 פריסת תשלומים ({scheduleItems.length} תשלומים)</span>
+                  <div style={{ display:'flex', gap:8 }}>
+                    <button type="button" className="btn btn-secondary btn-sm"
+                      onClick={() => setScheduleItems(buildAutoSchedule(form, form.charge_method_id))}>
+                      🔄 חשב מחדש
+                    </button>
+                    <button type="button" className="btn btn-secondary btn-sm"
+                      onClick={() => setShowSchedule(s => !s)}>
+                      {showSchedule ? '🔼 סגור' : '🔽 הצג/ערוך'}
+                    </button>
+                  </div>
+                </div>
+                {showSchedule && (
+                  <div style={{ maxHeight:300, overflowY:'auto', border:'1px solid #e5e7eb', borderRadius:6 }}>
+                    <table style={{ width:'100%', fontSize:12, borderCollapse:'collapse' }}>
+                      <thead>
+                        <tr style={{ background:'#f8fafc' }}>
+                          <th style={{ padding:'6px 8px', textAlign:'right', borderBottom:'1px solid #e5e7eb' }}>#</th>
+                          <th style={{ padding:'6px 8px', textAlign:'right', borderBottom:'1px solid #e5e7eb' }}>תאריך</th>
+                          <th style={{ padding:'6px 8px', textAlign:'right', borderBottom:'1px solid #e5e7eb' }}>סכום (₪)</th>
+                          <th style={{ padding:'6px 8px', textAlign:'right', borderBottom:'1px solid #e5e7eb' }}>אמצעי תשלום</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {scheduleItems.map((item, idx) => (
+                          <tr key={idx} style={{ borderBottom:'1px solid #f1f5f9' }}>
+                            <td style={{ padding:'4px 8px', color:'#64748b' }}>{item.installment_number}</td>
+                            <td style={{ padding:'4px 8px' }}>
+                              <input type="date" style={{ border:'1px solid #e5e7eb', borderRadius:4, padding:'2px 4px', fontSize:12, width:130 }}
+                                value={item.charge_date || ''}
+                                onChange={e => setScheduleItems(s => s.map((it,i) => i===idx ? {...it, charge_date:e.target.value, charge_month:e.target.value.substring(0,7)} : it))}
+                              />
+                            </td>
+                            <td style={{ padding:'4px 8px' }}>
+                              <input type="number" style={{ border:'1px solid #e5e7eb', borderRadius:4, padding:'2px 4px', fontSize:12, width:90 }}
+                                value={item.amount || ''}
+                                onChange={e => setScheduleItems(s => s.map((it,i) => i===idx ? {...it, amount:+e.target.value} : it))}
+                              />
+                            </td>
+                            <td style={{ padding:'4px 8px' }}>
+                              <select style={{ border:'1px solid #e5e7eb', borderRadius:4, padding:'2px 4px', fontSize:12 }}
+                                value={item.payment_method_id || ''}
+                                onChange={e => setScheduleItems(s => s.map((it,i) => i===idx ? {...it, payment_method_id:+e.target.value||null} : it))}>
+                                <option value="">ללא</option>
+                                {paymentMethods.map(pm => <option key={pm.id} value={pm.id}>{pm.name}</option>)}
+                              </select>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
               <div className="form-group"><label className="form-label">הערות</label><textarea className="form-control" rows={2} value={form.notes||''} onChange={e=>f('notes',e.target.value)}/></div>
             </div>

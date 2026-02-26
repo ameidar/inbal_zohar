@@ -47,6 +47,8 @@ export default function VehicleDetail() {
   const [editingInsurance, setEditingInsurance] = useState(null); // null = add, obj = edit
   const [insuranceForm, setInsuranceForm] = useState({});
   const [insuranceSaving, setInsuranceSaving] = useState(false);
+  const [insScheduleItems, setInsScheduleItems] = useState([]);
+  const [showInsSchedule, setShowInsSchedule] = useState(false);
 
   // ── Maintenance modal ──
   const [showMaintenanceModal, setShowMaintenanceModal] = useState(false);
@@ -108,6 +110,33 @@ export default function VehicleDetail() {
     finally { setSavingPM(false); }
   }
 
+  // ── Schedule helpers ──
+  function buildAutoSchedule(formData, pmId) {
+    const total = parseFloat(formData.total_premium) || 0;
+    const count = parseInt(formData.num_payments) || 1;
+    const chargeDay = parseInt(formData.first_charge_day) || 1;
+    const startDate = formData.start_date ? new Date(formData.start_date) : null;
+    const perInstallment = count > 0 ? (total / count) : total;
+    return Array.from({ length: count }, (_, i) => {
+      let chargeDate = null;
+      let chargeMonth = null;
+      if (startDate) {
+        const d = new Date(startDate);
+        d.setMonth(d.getMonth() + i);
+        d.setDate(Math.min(chargeDay, new Date(d.getFullYear(), d.getMonth()+1, 0).getDate()));
+        chargeDate = d.toISOString().split('T')[0];
+        chargeMonth = chargeDate.substring(0, 7);
+      }
+      return {
+        installment_number: i + 1,
+        amount: Math.round(perInstallment * 100) / 100,
+        charge_date: chargeDate,
+        charge_month: chargeMonth,
+        payment_method_id: pmId || formData.charge_method_id || null,
+      };
+    });
+  }
+
   // ── Purchase handlers ──
   function openPurchaseEdit() {
     setPurchaseForm({
@@ -147,12 +176,15 @@ export default function VehicleDetail() {
   // ── Insurance handlers ──
   function openAddInsurance() {
     setEditingInsurance(null);
-    setInsuranceForm({ vehicle_id: +id, status: 'פעילה', num_payments: 1, first_charge_day: 1 });
+    const newForm = { vehicle_id: +id, status: 'פעילה', num_payments: 1, first_charge_day: 1 };
+    setInsuranceForm(newForm);
+    setInsScheduleItems(buildAutoSchedule(newForm, null));
+    setShowInsSchedule(false);
     setShowInsuranceModal(true);
   }
   function openEditInsurance(p) {
     setEditingInsurance(p);
-    setInsuranceForm({
+    const editForm = {
       vehicle_id: p.vehicle_id,
       policy_number: p.policy_number || '',
       coverage_type: p.coverage_type || '',
@@ -165,16 +197,33 @@ export default function VehicleDetail() {
       status: p.status || 'פעילה',
       notes: p.notes || '',
       charge_method_id: p.charge_method_id || null,
-    });
+    };
+    setInsuranceForm(editForm);
+    setShowInsSchedule(false);
+    if (p.id) {
+      fetch(`/api/insurance/${p.id}/schedule`, { headers: { Authorization: `Bearer ${token()}` } })
+        .then(r => r.json())
+        .then(items => {
+          setInsScheduleItems(items.length > 0 ? items : buildAutoSchedule(editForm, editForm.charge_method_id));
+        })
+        .catch(() => setInsScheduleItems(buildAutoSchedule(editForm, editForm.charge_method_id)));
+    } else {
+      setInsScheduleItems(buildAutoSchedule(editForm, editForm.charge_method_id));
+    }
     setShowInsuranceModal(true);
   }
   async function saveInsurance() {
     setInsuranceSaving(true);
     try {
+      let savedPolicy;
       if (editingInsurance) {
-        await apiFetch('PUT', `/api/insurance/${editingInsurance.id}`, insuranceForm);
+        savedPolicy = await apiFetch('PUT', `/api/insurance/${editingInsurance.id}`, insuranceForm);
       } else {
-        await apiFetch('POST', '/api/insurance', insuranceForm);
+        savedPolicy = await apiFetch('POST', '/api/insurance', insuranceForm);
+      }
+      const policyId = savedPolicy?.id || editingInsurance?.id;
+      if (policyId && insScheduleItems.length > 0) {
+        await api.bulkReplaceSchedule(policyId, insScheduleItems).catch(()=>{});
       }
       setShowInsuranceModal(false);
       reload();
@@ -382,6 +431,10 @@ export default function VehicleDetail() {
     } catch (e) { alert(e.message); }
     finally { setDieselSaving(false); }
   }
+
+  // Insurance charge day visibility
+  const insPM = paymentMethods.find(pm => pm.id === insuranceForm.charge_method_id);
+  const insShowChargeDay = !insPM || insPM.payment_type === 'אשראי' || (insPM.payment_type && insPM.payment_type.includes('הו'));
 
   if (!vehicle) return <div className="loading">טוען...</div>;
 
@@ -755,9 +808,11 @@ export default function VehicleDetail() {
             <Field label="פרמיה כוללת (₪)">{inp(insuranceForm, setInsuranceForm, 'total_premium', 'number')}</Field>
             <Field label="מספר תשלומים">{inp(insuranceForm, setInsuranceForm, 'num_payments', 'number', {min:1})}</Field>
           </div>
-          <div className="form-row">
-            <Field label="יום חיוב חודשי">{inp(insuranceForm, setInsuranceForm, 'first_charge_day', 'number', {min:1,max:28})}</Field>
-          </div>
+          {insShowChargeDay && (
+            <div className="form-row">
+              <Field label="יום חיוב חודשי">{inp(insuranceForm, setInsuranceForm, 'first_charge_day', 'number', {min:1,max:28})}</Field>
+            </div>
+          )}
           <Field label="אמצעי תשלום">
             <div style={{ display:'flex', gap:8, alignItems:'center' }}>
               <select className="form-control" style={{flex:1}}
@@ -787,6 +842,62 @@ export default function VehicleDetail() {
               </div>
             )}
           </Field>
+          <div style={{ borderTop:'1px solid #e5e7eb', paddingTop:12, marginTop:4 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+              <span style={{ fontWeight:700, fontSize:14 }}>📅 פריסת תשלומים ({insScheduleItems.length} תשלומים)</span>
+              <div style={{ display:'flex', gap:8 }}>
+                <button type="button" className="btn btn-secondary btn-sm"
+                  onClick={() => setInsScheduleItems(buildAutoSchedule(insuranceForm, insuranceForm.charge_method_id))}>
+                  🔄 חשב מחדש
+                </button>
+                <button type="button" className="btn btn-secondary btn-sm"
+                  onClick={() => setShowInsSchedule(s => !s)}>
+                  {showInsSchedule ? '🔼 סגור' : '🔽 הצג/ערוך'}
+                </button>
+              </div>
+            </div>
+            {showInsSchedule && (
+              <div style={{ maxHeight:300, overflowY:'auto', border:'1px solid #e5e7eb', borderRadius:6 }}>
+                <table style={{ width:'100%', fontSize:12, borderCollapse:'collapse' }}>
+                  <thead>
+                    <tr style={{ background:'#f8fafc' }}>
+                      <th style={{ padding:'6px 8px', textAlign:'right', borderBottom:'1px solid #e5e7eb' }}>#</th>
+                      <th style={{ padding:'6px 8px', textAlign:'right', borderBottom:'1px solid #e5e7eb' }}>תאריך</th>
+                      <th style={{ padding:'6px 8px', textAlign:'right', borderBottom:'1px solid #e5e7eb' }}>סכום (₪)</th>
+                      <th style={{ padding:'6px 8px', textAlign:'right', borderBottom:'1px solid #e5e7eb' }}>אמצעי תשלום</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {insScheduleItems.map((item, idx) => (
+                      <tr key={idx} style={{ borderBottom:'1px solid #f1f5f9' }}>
+                        <td style={{ padding:'4px 8px', color:'#64748b' }}>{item.installment_number}</td>
+                        <td style={{ padding:'4px 8px' }}>
+                          <input type="date" style={{ border:'1px solid #e5e7eb', borderRadius:4, padding:'2px 4px', fontSize:12, width:130 }}
+                            value={item.charge_date || ''}
+                            onChange={e => setInsScheduleItems(s => s.map((it,i) => i===idx ? {...it, charge_date:e.target.value, charge_month:e.target.value.substring(0,7)} : it))}
+                          />
+                        </td>
+                        <td style={{ padding:'4px 8px' }}>
+                          <input type="number" style={{ border:'1px solid #e5e7eb', borderRadius:4, padding:'2px 4px', fontSize:12, width:90 }}
+                            value={item.amount || ''}
+                            onChange={e => setInsScheduleItems(s => s.map((it,i) => i===idx ? {...it, amount:+e.target.value} : it))}
+                          />
+                        </td>
+                        <td style={{ padding:'4px 8px' }}>
+                          <select style={{ border:'1px solid #e5e7eb', borderRadius:4, padding:'2px 4px', fontSize:12 }}
+                            value={item.payment_method_id || ''}
+                            onChange={e => setInsScheduleItems(s => s.map((it,i) => i===idx ? {...it, payment_method_id:+e.target.value||null} : it))}>
+                            <option value="">ללא</option>
+                            {paymentMethods.map(pm => <option key={pm.id} value={pm.id}>{pm.name}</option>)}
+                          </select>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
           <Field label="הערות">
             <textarea className="form-control" rows={2} value={insuranceForm.notes||''} onChange={e=>setInsuranceForm(f=>({...f,notes:e.target.value}))}/>
           </Field>

@@ -148,4 +148,8 @@ export const api = {
 
   // Missing Data
   getMissingData: (vehicleId) => req('GET', `/vehicles/${vehicleId}/missing-data`),
+
+  // Payment schedule helpers
+  bulkReplaceSchedule: (policyId, items) => req('POST', '/payment-schedule/bulk-replace', { policy_id: policyId, items }),
+  policySchedule: (policyId) => req('GET', `/insurance/${policyId}/schedule`),
 };

@@ -99,6 +99,20 @@ router.delete('/:id', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// GET /:id/schedule — get schedule items for a policy
+router.get('/:id/schedule', async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT psi.*, pm.name as payment_method_name
+      FROM payment_schedule_items psi
+      LEFT JOIN payment_methods pm ON pm.id = psi.payment_method_id
+      WHERE psi.policy_id=$1
+      ORDER BY psi.installment_number
+    `, [req.params.id]);
+    res.json(r.rows);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // Update a single payment
 router.put('/:id/payments/:pid', async (req, res) => {
   try {

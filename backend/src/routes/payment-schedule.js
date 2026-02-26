@@ -110,4 +110,39 @@ router.delete('/:id', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// POST /api/payment-schedule/bulk-replace
+// Deletes all items for a policy and inserts new ones
+router.post('/bulk-replace', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { policy_id, items } = req.body;
+    if (!policy_id) return res.status(400).json({ error: 'policy_id required' });
+    await client.query('BEGIN');
+    await client.query('DELETE FROM payment_schedule_items WHERE policy_id=$1', [policy_id]);
+    const inserted = [];
+    for (const item of (items || [])) {
+      const r = await client.query(`
+        INSERT INTO payment_schedule_items
+          (policy_id, payment_method_id, amount, charge_date, charge_month, installment_number, status, notes)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *
+      `, [
+        policy_id,
+        item.payment_method_id || null,
+        item.amount,
+        item.charge_date || null,
+        item.charge_month || null,
+        item.installment_number,
+        item.status || 'Planned',
+        item.notes || null
+      ]);
+      inserted.push(r.rows[0]);
+    }
+    await client.query('COMMIT');
+    res.json(inserted);
+  } catch (e) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: e.message });
+  } finally { client.release(); }
+});
+
 module.exports = router;
