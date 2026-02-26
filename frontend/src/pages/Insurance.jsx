@@ -180,9 +180,11 @@ export default function Insurance() {
   // Smart first charge date display
   const selectedPM = paymentMethods.find(pm => pm.id === (form.charge_method_id));
   const isAutoChargeDay = selectedPM && selectedPM.monthly_charge_day && (selectedPM.payment_type === 'אשראי' || (selectedPM.payment_type && selectedPM.payment_type.includes('הו')));
-  const computedFirstCharge = calcFirstChargeDate(form.start_date || new Date().toISOString().split('T')[0], selectedPM);
-  const firstChargeLabel = isAutoChargeDay
-    ? `חיוב ראשון מחושב: ${computedFirstCharge ? new Date(computedFirstCharge).toLocaleDateString('he-IL') : '—'} (יום ${selectedPM.monthly_charge_day} לחודש)`
+  const computedFirstCharge = calcFirstChargeDate(form.purchase_date || new Date().toISOString().split('T')[0], selectedPM);
+  const firstChargeDisplay = form.charge_method_id && computedFirstCharge
+    ? isAutoChargeDay
+      ? `${new Date(computedFirstCharge).toLocaleDateString('he-IL')} (יום ${selectedPM.monthly_charge_day} לחודש — מחושב)`
+      : new Date(computedFirstCharge).toLocaleDateString('he-IL')
     : null;
 
   return (
@@ -417,16 +419,7 @@ export default function Insurance() {
                     <option value="">בחר אמצעי תשלום</option>
                     {paymentMethods.map(pm=><option key={pm.id} value={pm.id}>{pm.name}{pm.monthly_charge_day ? ` (יום ${pm.monthly_charge_day})` : ''}</option>)}
                   </select>
-                  {firstChargeLabel && (
-                    <div style={{fontSize:12, color:'#0369a1', marginTop:4, fontWeight:600}}>
-                      📅 {firstChargeLabel}
-                    </div>
-                  )}
-                  {!isAutoChargeDay && computedFirstCharge && form.charge_method_id && (
-                    <div style={{fontSize:12, color:'#64748b', marginTop:4}}>
-                      📅 חיוב ראשון: {new Date(computedFirstCharge).toLocaleDateString('he-IL')}
-                    </div>
-                  )}
+                  
                 </div>
                 <div className="form-group"><label className="form-label">סטטוס</label>
                   <select className="form-control" value={form.status||'פעילה'} onChange={e=>f('status',e.target.value)}>
@@ -442,6 +435,13 @@ export default function Insurance() {
                   f('purchase_date', val);
                   setScheduleItems(buildAutoSchedule({...form, purchase_date: val}, form.charge_method_id, pm));
                 }}/>
+                <div style={{marginTop:8, padding:'8px 12px', background: firstChargeDisplay ? '#f0fdf4' : '#f8fafc', border:`1px solid ${firstChargeDisplay ? '#86efac' : '#e2e8f0'}`, borderRadius:6, fontSize:13}}>
+                  <span style={{color:'#64748b'}}>⚡ חיוב ראשון: </span>
+                  {firstChargeDisplay
+                    ? <strong style={{color:'#15803d'}}>📅 {firstChargeDisplay}</strong>
+                    : <span style={{color:'#94a3b8'}}>בחר אמצעי תשלום לחישוב</span>
+                  }
+                </div>
               </div>
               <div style={{ borderTop:'1px solid #e5e7eb', paddingTop:12, marginTop:4 }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>

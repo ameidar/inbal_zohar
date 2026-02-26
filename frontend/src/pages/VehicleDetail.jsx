@@ -896,7 +896,7 @@ export default function VehicleDetail() {
             </div>
             {(() => {
               const pm = paymentMethods.find(p => p.id === insuranceForm.charge_method_id);
-              const firstDate = calcFirstChargeDate(insuranceForm.start_date || new Date().toISOString().split('T')[0], pm);
+              const firstDate = calcFirstChargeDate(insuranceForm.purchase_date || new Date().toISOString().split('T')[0], pm);
               if (!pm || !firstDate) return null;
               const isAuto = pm.monthly_charge_day && (pm.payment_type === 'אשראי' || (pm.payment_type && pm.payment_type.includes('הו')));
               return (
@@ -933,6 +933,25 @@ export default function VehicleDetail() {
                 setInsuranceForm(f=>({...f, purchase_date: val}));
                 setInsScheduleItems(buildAutoSchedule({...insuranceForm, purchase_date: val}, insuranceForm.charge_method_id, pm));
               }}/>
+            {(() => {
+              const pm = paymentMethods.find(p => p.id === insuranceForm.charge_method_id);
+              const firstDate = calcFirstChargeDate(insuranceForm.purchase_date || new Date().toISOString().split('T')[0], pm);
+              const isAuto = pm && pm.monthly_charge_day && (pm.payment_type === 'אשראי' || (pm.payment_type && pm.payment_type.includes('הו')));
+              const label = firstDate
+                ? isAuto
+                  ? `${new Date(firstDate).toLocaleDateString('he-IL')} (יום ${pm.monthly_charge_day} לחודש — מחושב)`
+                  : new Date(firstDate).toLocaleDateString('he-IL')
+                : null;
+              return (
+                <div style={{marginTop:8, padding:'8px 12px', background: label ? '#f0fdf4' : '#f8fafc', border:`1px solid ${label ? '#86efac' : '#e2e8f0'}`, borderRadius:6, fontSize:13}}>
+                  <span style={{color:'#64748b'}}>⚡ חיוב ראשון: </span>
+                  {label
+                    ? <strong style={{color:'#15803d'}}>📅 {label}</strong>
+                    : <span style={{color:'#94a3b8'}}>בחר אמצעי תשלום לחישוב</span>
+                  }
+                </div>
+              );
+            })()}
           </Field>
           <div style={{ borderTop:'1px solid #e5e7eb', paddingTop:12, marginTop:4 }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
