@@ -156,7 +156,7 @@ export default function VehicleDetail() {
     const total = parseFloat(formData.total_premium) || 0;
     const count = parseInt(formData.num_payments) || 1;
     const pm = pmDirect || paymentMethods.find(p => p.id === (pmId || formData.charge_method_id));
-    const baseDate = formData.purchase_date || formData.start_date || new Date().toISOString().split('T')[0];
+    const baseDate = formData.purchase_date || new Date().toISOString().split('T')[0];
     const firstDate = calcFirstChargeDate(baseDate, pm);
     const perInstallment = count > 0 ? (total / count) : total;
     return Array.from({ length: count }, (_, i) => {
@@ -216,7 +216,8 @@ export default function VehicleDetail() {
   // ── Insurance handlers ──
   function openAddInsurance() {
     setEditingInsurance(null);
-    const newForm = { vehicle_id: +id, status: 'פעילה', num_payments: 1, first_charge_day: 1 };
+    const today = new Date().toISOString().split('T')[0];
+    const newForm = { vehicle_id: +id, status: 'פעילה', num_payments: 1, first_charge_day: 1, purchase_date: today };
     setInsuranceForm(newForm);
     setInsScheduleItems(buildAutoSchedule(newForm, null));
     setShowInsSchedule(false);
@@ -871,16 +872,6 @@ export default function VehicleDetail() {
             <Field label="סטטוס">{sel(insuranceForm, setInsuranceForm, 'status', ['פעילה','בוטלה','בהקפאה'])}</Field>
           </div>
           <div className="form-row">
-            <Field label={<>תאריך רכישה <span style={{fontSize:11,color:'#6b7280'}}>(מתי נרכשה)</span></>}>
-              <input className="form-control" type="date"
-                value={insuranceForm.purchase_date?.split('T')[0]||''}
-                onChange={e=>{
-                  const val = e.target.value;
-                  const pm = paymentMethods.find(p => p.id === insuranceForm.charge_method_id);
-                  setInsuranceForm(f=>({...f, purchase_date: val}));
-                  setInsScheduleItems(buildAutoSchedule({...insuranceForm, purchase_date: val}, insuranceForm.charge_method_id, pm));
-                }}/>
-            </Field>
             <Field label={<>תאריך התחלה <span style={{fontSize:11,color:'#6b7280'}}>(כיסוי מ-)</span></>}>{inp(insuranceForm, setInsuranceForm, 'start_date', 'date')}</Field>
             <Field label="תאריך סיום">{inp(insuranceForm, setInsuranceForm, 'expiry_date', 'date')}</Field>
           </div>
@@ -932,6 +923,16 @@ export default function VehicleDetail() {
                 </div>
               </div>
             )}
+          </Field>
+          <Field label={<>תאריך רכישה <span style={{fontSize:11,color:'#6b7280'}}>(מתי שולמה — בסיס לחישוב חיוב)</span></>}>
+            <input className="form-control" type="date"
+              value={insuranceForm.purchase_date?.split('T')[0]||''}
+              onChange={e=>{
+                const val = e.target.value;
+                const pm = paymentMethods.find(p => p.id === insuranceForm.charge_method_id);
+                setInsuranceForm(f=>({...f, purchase_date: val}));
+                setInsScheduleItems(buildAutoSchedule({...insuranceForm, purchase_date: val}, insuranceForm.charge_method_id, pm));
+              }}/>
           </Field>
           <div style={{ borderTop:'1px solid #e5e7eb', paddingTop:12, marginTop:4 }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>

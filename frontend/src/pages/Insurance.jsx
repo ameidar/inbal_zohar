@@ -51,7 +51,8 @@ export default function Insurance() {
 
   function openAdd() {
     setEditItem(null);
-    const newForm = { status:'פעילה', coverage_type:'חובה', num_payments:12, first_charge_day:1 };
+    const today = new Date().toISOString().split('T')[0];
+    const newForm = { status:'פעילה', coverage_type:'חובה', num_payments:12, first_charge_day:1, purchase_date: today };
     setForm(newForm);
     setScheduleItems(buildAutoSchedule(newForm, null));
     setShowSchedule(false);
@@ -95,7 +96,7 @@ export default function Insurance() {
     const total = parseFloat(formData.total_premium) || 0;
     const count = parseInt(formData.num_payments) || 1;
     const pm = pmDirect || paymentMethods.find(p => p.id === (pmId || formData.charge_method_id));
-    const baseDate = formData.purchase_date || formData.start_date || new Date().toISOString().split('T')[0];
+    const baseDate = formData.purchase_date || new Date().toISOString().split('T')[0];
     const firstDate = calcFirstChargeDate(baseDate, pm);
     const perInstallment = count > 0 ? (total / count) : total;
     return Array.from({ length: count }, (_, i) => {
@@ -396,16 +397,7 @@ export default function Insurance() {
                   </datalist>
                 </div>
               </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label">תאריך רכישה <span style={{fontSize:11,color:'#6b7280'}}>(מתי נרכשה)</span></label>
-                  <input className="form-control" type="date" value={form.purchase_date?.split('T')[0]||''} onChange={e=>{
-                    const val = e.target.value;
-                    const pm = paymentMethods.find(p => p.id === form.charge_method_id);
-                    f('purchase_date', val);
-                    setScheduleItems(buildAutoSchedule({...form, purchase_date: val}, form.charge_method_id, pm));
-                  }}/>
-                </div>
+              <div className="form-row cols-2">
                 <div className="form-group"><label className="form-label">תחילת פוליסה <span style={{fontSize:11,color:'#6b7280'}}>(כיסוי מ-)</span></label><input className="form-control" type="date" value={form.start_date?.split('T')[0]||''} onChange={e=>f('start_date',e.target.value)}/></div>
                 <div className="form-group"><label className="form-label">תפוגת פוליסה</label><input className="form-control" type="date" value={form.expiry_date?.split('T')[0]||''} onChange={e=>f('expiry_date',e.target.value)}/></div>
               </div>
@@ -441,6 +433,15 @@ export default function Insurance() {
                     {['פעילה','לא פעילה','בוטלה'].map(s=><option key={s}>{s}</option>)}
                   </select>
                 </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">תאריך רכישה <span style={{fontSize:11,color:'#6b7280'}}>(מתי שולמה — בסיס לחישוב חיוב)</span></label>
+                <input className="form-control" type="date" value={form.purchase_date?.split('T')[0]||''} onChange={e=>{
+                  const val = e.target.value;
+                  const pm = paymentMethods.find(p => p.id === form.charge_method_id);
+                  f('purchase_date', val);
+                  setScheduleItems(buildAutoSchedule({...form, purchase_date: val}, form.charge_method_id, pm));
+                }}/>
               </div>
               <div style={{ borderTop:'1px solid #e5e7eb', paddingTop:12, marginTop:4 }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
