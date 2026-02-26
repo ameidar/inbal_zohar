@@ -44,6 +44,62 @@ router.get('/', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// GET /api/insurance/monthly-summary — monthly cost breakdown for active policies
+router.get('/monthly-summary', async (req, res) => {
+  try {
+    // Per policy: monthly = total_premium / num_payments
+    const r = await pool.query(`
+      SELECT
+        p.id,
+        p.policy_number,
+        p.coverage_type,
+        p.insurer,
+        p.status,
+        p.total_premium,
+        p.num_payments,
+        ROUND((p.total_premium / NULLIF(p.num_payments,0))::numeric, 2) as monthly_cost,
+        pm.name as payment_method_name,
+        COALESCE(pm.payment_type, 'לא משויך') as payment_type,
+        v.vehicle_number,
+        v.nickname
+      FROM insurance_policies p
+      LEFT JOIN payment_methods pm ON pm.id = p.charge_method_id
+      LEFT JOIN vehicles v ON v.id = p.vehicle_id
+      WHERE p.status = 'פעילה' AND p.total_premium IS NOT NULL
+      ORDER BY p.coverage_type, pm.name, p.total_premium DESC
+    `);
+
+    const rows = r.rows;
+    const total = rows.reduce((s, r) => s + parseFloat(r.monthly_cost || 0), 0);
+
+    // Group by coverage_type
+    const byCoverage = {};
+    rows.forEach(r => {
+      const k = r.coverage_type || 'אחר';
+      if (!byCoverage[k]) byCoverage[k] = { coverage_type: k, monthly_cost: 0, count: 0 };
+      byCoverage[k].monthly_cost += parseFloat(r.monthly_cost || 0);
+      byCoverage[k].count++;
+    });
+
+    // Group by payment_type
+    const byPayment = {};
+    rows.forEach(r => {
+      const k = r.payment_method_name || 'לא משויך';
+      if (!byPayment[k]) byPayment[k] = { payment_method: k, payment_type: r.payment_type, monthly_cost: 0, count: 0 };
+      byPayment[k].monthly_cost += parseFloat(r.monthly_cost || 0);
+      byPayment[k].count++;
+    });
+
+    res.json({
+      policies: rows,
+      byCoverage: Object.values(byCoverage).sort((a,b) => b.monthly_cost - a.monthly_cost),
+      byPayment: Object.values(byPayment).sort((a,b) => b.monthly_cost - a.monthly_cost),
+      total: Math.round(total * 100) / 100,
+      activeCount: rows.length
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 router.get('/:id', async (req, res) => {
   try {
     const pol = (await pool.query('SELECT p.*, v.vehicle_number, v.nickname FROM insurance_policies p LEFT JOIN vehicles v ON v.id=p.vehicle_id WHERE p.id=$1', [req.params.id])).rows[0];

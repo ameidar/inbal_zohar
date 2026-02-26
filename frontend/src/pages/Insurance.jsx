@@ -194,6 +194,7 @@ export default function Insurance() {
           <h2 style={{ fontSize:18, fontWeight:700 }}>ביטוח — {policies.length} פוליסות</h2>
           <Link to="/dept/vehicles/policies/payments" style={{ fontSize:13, color:'#0369a1', fontWeight:600, padding:'4px 10px', background:'#e0f2fe', borderRadius:6, textDecoration:'none' }}>📊 לוח תשלומים</Link>
           <Link to="/dept/vehicles/reports/payment-methods" style={{ fontSize:13, color:'#7c3aed', fontWeight:600, padding:'4px 10px', background:'#ede9fe', borderRadius:6, textDecoration:'none' }}>📈 דוח אמצעי תשלום</Link>
+          <Link to="/dept/vehicles/reports/monthly-summary" style={{ fontSize:13, color:'#059669', fontWeight:600, padding:'4px 10px', background:'#d1fae5', borderRadius:6, textDecoration:'none' }}>💰 עלויות חודשיות</Link>
         </div>
         {user.role==='admin' && <button className="btn btn-primary" onClick={openAdd}>+ הוסף פוליסה</button>}
       </div>

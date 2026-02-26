@@ -23,6 +23,7 @@ const DEPTS = [
       { to: '/dept/vehicles/policies/payments', icon: CreditCard, label: 'תשלומים' },
       { to: '/dept/vehicles/payment-methods', icon: CreditCard, label: 'אמצעי תשלום' },
       { to: '/dept/vehicles/reports/payment-methods', icon: BarChart2, label: 'דוח אמצעי תשלום' },
+      { to: '/dept/vehicles/reports/monthly-summary', icon: BarChart2, label: '📊 עלויות חודשיות' },
       { to: '/dept/vehicles/tools/list', icon: Package, label: 'כלי עבודה' },
       { to: '/dept/vehicles/tools/categories', icon: FolderOpen, label: 'קטגוריות כלים' },
       { to: '/dept/vehicles/documents', icon: FileText, label: 'מסמכים' },

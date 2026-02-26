@@ -152,4 +152,5 @@ export const api = {
   // Payment schedule helpers
   bulkReplaceSchedule: (policyId, items) => req('POST', '/payment-schedule/bulk-replace', { policy_id: policyId, items }),
   policySchedule: (policyId) => req('GET', `/insurance/${policyId}/schedule`),
+  insuranceMonthlySummary: () => req('GET', '/insurance/monthly-summary'),
 };
