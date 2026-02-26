@@ -9,6 +9,7 @@ function fmtCur(n) { return n != null ? `₪${Number(n).toLocaleString('he-IL')}
 export default function Insurance() {
   const [policies, setPolicies] = useState([]);
   const [vehicles, setVehicles] = useState([]);
+  const [paymentMethods, setPaymentMethods] = useState([]);
   const [selected, setSelected] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [editItem, setEditItem] = useState(null);
@@ -17,8 +18,12 @@ export default function Insurance() {
   const user = JSON.parse(localStorage.getItem('fleet_user') || '{}');
 
   async function load() {
-    const [data, v] = await Promise.all([api.policies().catch(()=>[]), api.vehicles().catch(()=>[])]);
-    setPolicies(data); setVehicles(v);
+    const [data, v, pm] = await Promise.all([
+      api.policies().catch(()=>[]),
+      api.vehicles().catch(()=>[]),
+      api.paymentMethods().catch(()=>[])
+    ]);
+    setPolicies(data); setVehicles(v); setPaymentMethods(pm);
   }
   async function loadSelected(id) {
     const data = await api.policy(id).catch(()=>null);
@@ -54,6 +59,22 @@ export default function Insurance() {
   }
 
   const vMap = Object.fromEntries(vehicles.map(v=>[v.id, v]));
+  const pmMap = Object.fromEntries(paymentMethods.map(pm=>[pm.id, pm]));
+
+  // Monthly cost: sum(total_premium / num_payments) for active policies
+  const activePolicies = policies.filter(p => p.status === 'פעילה');
+  const monthlyCostTotal = activePolicies.reduce((sum, p) => {
+    const monthly = p.total_premium && p.num_payments ? (parseFloat(p.total_premium) / parseInt(p.num_payments)) : 0;
+    return sum + monthly;
+  }, 0);
+
+  // Monthly cost by payment method
+  const monthlyCostByPM = {};
+  activePolicies.forEach(p => {
+    const pmName = pmMap[p.charge_method_id]?.name || 'לא משויך';
+    const monthly = p.total_premium && p.num_payments ? (parseFloat(p.total_premium) / parseInt(p.num_payments)) : 0;
+    monthlyCostByPM[pmName] = (monthlyCostByPM[pmName] || 0) + monthly;
+  });
 
   // Policies expiring this calendar month
   const nowDate = new Date();
@@ -70,6 +91,22 @@ export default function Insurance() {
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
         <h2 style={{ fontSize:18, fontWeight:700 }}>ביטוח — {policies.length} פוליסות</h2>
         {user.role==='admin' && <button className="btn btn-primary" onClick={openAdd}>+ הוסף פוליסה</button>}
+      </div>
+
+      {/* Monthly cost summary */}
+      <div style={{ display:'flex', gap:12, marginBottom:16, flexWrap:'wrap' }}>
+        <div className="card" style={{ flex:'0 0 auto', padding:'12px 20px', background:'#f0fdf4', border:'1px solid #86efac', minWidth:200 }}>
+          <div style={{ fontSize:12, color:'#15803d', fontWeight:600, marginBottom:4 }}>💰 עלות חודשית כוללת (פוליסות פעילות)</div>
+          <div style={{ fontSize:22, fontWeight:800, color:'#166534' }}>₪{Math.round(monthlyCostTotal).toLocaleString('he-IL')}</div>
+          <div style={{ fontSize:11, color:'#6b7280', marginTop:2 }}>{activePolicies.length} פוליסות פעילות</div>
+        </div>
+        {Object.entries(monthlyCostByPM).sort((a,b)=>b[1]-a[1]).map(([name, cost]) => (
+          <div key={name} className="card" style={{ flex:'0 0 auto', padding:'12px 16px', background:'#f8fafc', border:'1px solid #e2e8f0', minWidth:160 }}>
+            <div style={{ fontSize:11, color:'#64748b', fontWeight:600, marginBottom:4 }}>{name}</div>
+            <div style={{ fontSize:18, fontWeight:700, color:'#1e293b' }}>₪{Math.round(cost).toLocaleString('he-IL')}</div>
+            <div style={{ fontSize:11, color:'#94a3b8' }}>/ חודש</div>
+          </div>
+        ))}
       </div>
 
       {/* Expiring this month banner */}
@@ -124,7 +161,7 @@ export default function Insurance() {
           <div className="card-header"><span className="card-title">פוליסות</span></div>
           <div className="table-wrap">
             <table>
-              <thead><tr><th>מס' פוליסה</th><th>רכב</th><th>כיסוי</th><th>מבטח</th><th>עד תאריך</th><th>פרמיה</th><th>סטטוס</th><th>באיחור</th><th></th></tr></thead>
+              <thead><tr><th>מס' פוליסה</th><th>רכב</th><th>כיסוי</th><th>מבטח</th><th>עד תאריך</th><th>פרמיה</th><th>חודשי</th><th>אמצעי תשלום</th><th>סטטוס</th><th>באיחור</th><th></th></tr></thead>
               <tbody>
                 {policies.map(p=>{
                   const v = vMap[p.vehicle_id];
@@ -137,6 +174,16 @@ export default function Insurance() {
                       <td style={{fontSize:12}}>{p.insurer}</td>
                       <td style={{color:expiringSoon?'#dc2626':'',fontWeight:expiringSoon?700:''}}>{fmtDate(p.expiry_date)}{expiringSoon?' ⚠️':''}</td>
                       <td>{fmtCur(p.total_premium)}</td>
+                      <td style={{fontSize:12,color:'#0369a1',fontWeight:600}}>
+                        {p.total_premium && p.num_payments ? `₪${Math.round(parseFloat(p.total_premium)/parseInt(p.num_payments)).toLocaleString('he-IL')}` : '—'}
+                      </td>
+                      <td style={{fontSize:12}}>
+                        {pmMap[p.charge_method_id] ? (
+                          <span style={{background:'#e0f2fe',color:'#0369a1',padding:'2px 8px',borderRadius:12,fontWeight:600}}>
+                            {pmMap[p.charge_method_id].name}
+                          </span>
+                        ) : <span style={{color:'#9ca3af'}}>—</span>}
+                      </td>
                       <td><span className={`badge ${p.status==='פעילה'?'badge-green':p.status==='בוטלה'?'badge-red':'badge-gray'}`}>{p.status}</span></td>
                       <td>{p.overdue_count > 0 ? <span className="badge badge-red">{p.overdue_count} 🔴</span> : <span className="badge badge-green">תקין</span>}</td>
                       <td onClick={e=>e.stopPropagation()}>
@@ -148,7 +195,7 @@ export default function Insurance() {
                     </tr>
                   );
                 })}
-                {policies.length===0 && <tr><td colSpan={9} style={{textAlign:'center',color:'#9ca3af',padding:20}}>אין פוליסות</td></tr>}
+                {policies.length===0 && <tr><td colSpan={11} style={{textAlign:'center',color:'#9ca3af',padding:20}}>אין פוליסות</td></tr>}
               </tbody>
             </table>
           </div>
@@ -226,6 +273,19 @@ export default function Insurance() {
                 <div className="form-group"><label className="form-label">פרמיה כוללת (₪)</label><input className="form-control" type="number" value={form.total_premium ?? ''} onChange={e=>f('total_premium', e.target.value === '' ? '' : +e.target.value)}/></div>
                 <div className="form-group"><label className="form-label">מס' תשלומים</label><input className="form-control" type="number" value={form.num_payments ?? 12} onChange={e=>f('num_payments', e.target.value === '' ? '' : +e.target.value)}/></div>
                 <div className="form-group"><label className="form-label">יום חיוב בחודש</label><input className="form-control" type="number" min="1" max="28" value={form.first_charge_day ?? 1} onChange={e=>f('first_charge_day', e.target.value === '' ? '' : +e.target.value)}/></div>
+              </div>
+              <div className="form-row">
+                <div className="form-group"><label className="form-label">אמצעי תשלום</label>
+                  <select className="form-control" value={form.charge_method_id||''} onChange={e=>f('charge_method_id',+e.target.value||null)}>
+                    <option value="">בחר אמצעי תשלום</option>
+                    {paymentMethods.map(pm=><option key={pm.id} value={pm.id}>{pm.name}</option>)}
+                  </select>
+                </div>
+                <div className="form-group"><label className="form-label">סטטוס</label>
+                  <select className="form-control" value={form.status||'פעילה'} onChange={e=>f('status',e.target.value)}>
+                    {['פעילה','לא פעילה','בוטלה'].map(s=><option key={s}>{s}</option>)}
+                  </select>
+                </div>
               </div>
               <div className="form-group"><label className="form-label">הערות</label><textarea className="form-control" rows={2} value={form.notes||''} onChange={e=>f('notes',e.target.value)}/></div>
             </div>
