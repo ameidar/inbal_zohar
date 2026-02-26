@@ -50,6 +50,16 @@ const PAGE_TITLES = {
   '/dept/vehicles/duplicates': 'כפילויות',
 };
 
+function ComingSoon({ dept }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: 16, color: '#64748b' }}>
+      <div style={{ fontSize: 64 }}>🚧</div>
+      <h2 style={{ margin: 0, fontSize: 24, color: '#1e293b' }}>מחלקת {dept}</h2>
+      <p style={{ margin: 0, fontSize: 16 }}>המודול הזה בפיתוח — יהיה זמין בקרוב</p>
+    </div>
+  );
+}
+
 function Layout({ children }) {
   const navigate = useNavigate();
   const user = getUser();
@@ -156,6 +166,10 @@ export default function App() {
                 {/* Placeholder depts */}
                 <Route path="finance" element={<Finance />} />
                 <Route path="employees" element={<Employees />} />
+                <Route path="projects" element={<ComingSoon dept="פרויקטים" />} />
+                <Route path="clients" element={<ComingSoon dept="לקוחות" />} />
+                <Route path="tasks" element={<ComingSoon dept="משימות" />} />
+                <Route path="legal" element={<ComingSoon dept="משפטי" />} />
                 <Route path="*" element={<Navigate to="/dept/vehicles/dashboard" replace />} />
               </Routes>
             </Layout>
