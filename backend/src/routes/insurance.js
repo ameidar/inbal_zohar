@@ -25,6 +25,8 @@ async function createPayments(client, policyId) {
 // List policies with vehicle info
 router.get('/', async (req, res) => {
   try {
+    // Auto-expire: mark policies past expiry_date as "הסתיימה"
+    await pool.query(`UPDATE insurance_policies SET status='הסתיימה' WHERE expiry_date < CURRENT_DATE AND status='פעילה'`).catch(()=>{});
     const { vehicle_id, status } = req.query;
     let where = [];
     let params = [];
@@ -42,6 +44,62 @@ router.get('/', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// GET /api/insurance/monthly-summary — monthly cost breakdown for active policies
+router.get('/monthly-summary', async (req, res) => {
+  try {
+    // Per policy: monthly = total_premium / num_payments
+    const r = await pool.query(`
+      SELECT
+        p.id,
+        p.policy_number,
+        p.coverage_type,
+        p.insurer,
+        p.status,
+        p.total_premium,
+        p.num_payments,
+        ROUND((p.total_premium / NULLIF(p.num_payments,0))::numeric, 2) as monthly_cost,
+        pm.name as payment_method_name,
+        COALESCE(pm.payment_type, 'לא משויך') as payment_type,
+        v.vehicle_number,
+        v.nickname
+      FROM insurance_policies p
+      LEFT JOIN payment_methods pm ON pm.id = p.charge_method_id
+      LEFT JOIN vehicles v ON v.id = p.vehicle_id
+      WHERE p.status = 'פעילה' AND p.total_premium IS NOT NULL
+      ORDER BY p.coverage_type, pm.name, p.total_premium DESC
+    `);
+
+    const rows = r.rows;
+    const total = rows.reduce((s, r) => s + parseFloat(r.monthly_cost || 0), 0);
+
+    // Group by coverage_type
+    const byCoverage = {};
+    rows.forEach(r => {
+      const k = r.coverage_type || 'אחר';
+      if (!byCoverage[k]) byCoverage[k] = { coverage_type: k, monthly_cost: 0, count: 0 };
+      byCoverage[k].monthly_cost += parseFloat(r.monthly_cost || 0);
+      byCoverage[k].count++;
+    });
+
+    // Group by payment_type
+    const byPayment = {};
+    rows.forEach(r => {
+      const k = r.payment_method_name || 'לא משויך';
+      if (!byPayment[k]) byPayment[k] = { payment_method: k, payment_type: r.payment_type, monthly_cost: 0, count: 0 };
+      byPayment[k].monthly_cost += parseFloat(r.monthly_cost || 0);
+      byPayment[k].count++;
+    });
+
+    res.json({
+      policies: rows,
+      byCoverage: Object.values(byCoverage).sort((a,b) => b.monthly_cost - a.monthly_cost),
+      byPayment: Object.values(byPayment).sort((a,b) => b.monthly_cost - a.monthly_cost),
+      total: Math.round(total * 100) / 100,
+      activeCount: rows.length
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 router.get('/:id', async (req, res) => {
   try {
     const pol = (await pool.query('SELECT p.*, v.vehicle_number, v.nickname FROM insurance_policies p LEFT JOIN vehicles v ON v.id=p.vehicle_id WHERE p.id=$1', [req.params.id])).rows[0];
@@ -55,11 +113,11 @@ router.post('/', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { vehicle_id, tool_id, policy_number, coverage_type, insurer, start_date, expiry_date, total_premium, num_payments, first_charge_day, charge_method_id, status, notes } = req.body;
+    const { vehicle_id, tool_id, policy_number, policy_type, coverage_type, insurer, start_date, expiry_date, purchase_date, total_premium, num_payments, first_charge_day, charge_method_id, status, notes } = req.body;
     const r = await client.query(
-      `INSERT INTO insurance_policies (vehicle_id, tool_id, policy_number, coverage_type, insurer, start_date, expiry_date, total_premium, num_payments, first_charge_day, charge_method_id, status, notes)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
-      [vehicle_id, tool_id, policy_number, coverage_type, insurer, start_date||null, expiry_date||null, total_premium, num_payments||1, first_charge_day||1, charge_method_id, status||'פעילה', notes]
+      `INSERT INTO insurance_policies (vehicle_id, tool_id, policy_number, policy_type, coverage_type, insurer, start_date, expiry_date, purchase_date, total_premium, num_payments, first_charge_day, charge_method_id, status, notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+      [vehicle_id||null, tool_id||null, policy_number, policy_type||null, coverage_type, insurer, start_date||null, expiry_date||null, purchase_date||null, total_premium, num_payments||1, first_charge_day||1, charge_method_id||null, status||'פעילה', notes]
     );
     const policy = r.rows[0];
     await createPayments(client, policy.id);
@@ -72,11 +130,11 @@ router.put('/:id', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const fields = ['vehicle_id','tool_id','policy_number','coverage_type','insurer','start_date','expiry_date','total_premium','num_payments','first_charge_day','charge_method_id','status','notes'];
+    const fields = ['vehicle_id','tool_id','policy_number','policy_type','coverage_type','insurer','start_date','expiry_date','purchase_date','total_premium','num_payments','first_charge_day','charge_method_id','status','notes'];
     const data = req.body;
     const cols = fields.filter(f => data[f] !== undefined);
     if (!cols.length) return res.status(400).json({ error: 'No fields' });
-    const dateFields = ['start_date', 'expiry_date'];
+    const dateFields = ['start_date', 'expiry_date', 'purchase_date'];
     const vals = cols.map(f => (dateFields.includes(f) && data[f] === '') ? null : data[f]);
     vals.push(req.params.id);
     const r = await client.query(`UPDATE insurance_policies SET ${cols.map((f,i)=>`${f}=$${i+1}`).join(',')} WHERE id=$${vals.length} RETURNING *`, vals);
@@ -96,6 +154,20 @@ router.delete('/:id', async (req, res) => {
     const r = await pool.query('DELETE FROM insurance_policies WHERE id=$1 RETURNING id', [req.params.id]);
     if (!r.rows[0]) return res.status(404).json({ error: 'Not found' });
     res.json({ deleted: req.params.id });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /:id/schedule — get schedule items for a policy
+router.get('/:id/schedule', async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT psi.*, pm.name as payment_method_name
+      FROM payment_schedule_items psi
+      LEFT JOIN payment_methods pm ON pm.id = psi.payment_method_id
+      WHERE psi.policy_id=$1
+      ORDER BY psi.installment_number
+    `, [req.params.id]);
+    res.json(r.rows);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

@@ -22,7 +22,7 @@ function VehicleCard({ v, onEdit, onDel, isAdmin }) {
       onMouseLeave={e => e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.07)'}
     >
       {/* Image */}
-      <Link to={`/vehicles/${v.id}`} style={{ textDecoration: 'none', display: 'block' }}>
+      <Link to={`/dept/vehicles/${v.id}/overview`} style={{ textDecoration: 'none', display: 'block' }}>
         <div style={{
           width: '100%', height: 140, background: '#f3f4f6',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -54,7 +54,7 @@ function VehicleCard({ v, onEdit, onDel, isAdmin }) {
 
       {/* Info */}
       <div style={{ padding: '12px 14px', flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <Link to={`/vehicles/${v.id}`} style={{ textDecoration: 'none' }}>
+        <Link to={`/dept/vehicles/${v.id}/overview`} style={{ textDecoration: 'none' }}>
           <div style={{ fontWeight: 700, fontSize: 16, color: '#1e40af' }}>{v.vehicle_number}</div>
           {v.nickname && <div style={{ fontSize: 12, color: '#6b7280' }}>{v.nickname}</div>}
           <div style={{ fontSize: 12, color: '#374151', marginTop: 2 }}>
@@ -181,7 +181,7 @@ export default function Vehicles() {
               <tbody>
                 {vehicles.map(v => (
                   <tr key={v.id}>
-                    <td><Link to={`/vehicles/${v.id}`} style={{color:'#1e40af',fontWeight:600}}>{v.vehicle_number}</Link></td>
+                    <td><Link to={`/dept/vehicles/${v.id}/overview`} style={{color:'#1e40af',fontWeight:600}}>{v.vehicle_number}</Link></td>
                     <td>{v.nickname || '—'}</td>
                     <td>{v.asset_type}</td>
                     <td>{v.manufacturer} {v.model}</td>
@@ -198,7 +198,7 @@ export default function Vehicles() {
                         <button className="btn btn-secondary btn-sm" onClick={()=>openEdit(v)} style={{marginLeft:4}}>✏️</button>
                         <button className="btn btn-danger btn-sm" onClick={()=>del(v)}>🗑️</button>
                       </>}
-                      <Link to={`/vehicles/${v.id}`} className="btn btn-secondary btn-sm" style={{marginRight:4}}>←</Link>
+                      <Link to={`/dept/vehicles/${v.id}/overview`} className="btn btn-secondary btn-sm" style={{marginRight:4}}>←</Link>
                     </td>
                   </tr>
                 ))}

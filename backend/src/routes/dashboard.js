@@ -108,19 +108,25 @@ router.get('/alerts', async (req, res) => {
 // Stats
 router.get('/stats', async (req, res) => {
   try {
-    const [vehicles, employees, pendingPayments, activePolicies, openMaintenance] = await Promise.all([
+    const [vehicles, employees, pendingPayments, activePolicies, openMaintenance, duplicateVehicles] = await Promise.all([
       pool.query(`SELECT status, COUNT(*)::int as cnt FROM vehicles GROUP BY status`),
       pool.query(`SELECT COUNT(*)::int as cnt FROM employees WHERE active=true`),
       pool.query(`SELECT COUNT(*)::int as cnt FROM insurance_payments WHERE status='פתוח' AND charge_date <= CURRENT_DATE + INTERVAL '30 days'`),
       pool.query(`SELECT COUNT(*)::int as cnt FROM insurance_policies WHERE status='פעילה'`),
-      pool.query(`SELECT COUNT(*)::int as cnt FROM maintenance WHERE status='פתוח'`)
+      pool.query(`SELECT COUNT(*)::int as cnt FROM maintenance WHERE status='פתוח'`),
+      pool.query(`SELECT COUNT(*)::int as cnt FROM (
+        SELECT vehicle_number FROM vehicles WHERE merge_status IS NULL GROUP BY vehicle_number HAVING COUNT(*) > 1
+        UNION
+        SELECT chassis_number::text FROM vehicles WHERE chassis_number IS NOT NULL AND chassis_number != '' AND merge_status IS NULL GROUP BY chassis_number HAVING COUNT(*) > 1
+      ) dupes`)
     ]);
     res.json({
       vehicles_by_status: vehicles.rows,
       active_employees: employees.rows[0]?.cnt || 0,
       pending_payments_30d: pendingPayments.rows[0]?.cnt || 0,
       active_policies: activePolicies.rows[0]?.cnt || 0,
-      open_maintenance: openMaintenance.rows[0]?.cnt || 0
+      open_maintenance: openMaintenance.rows[0]?.cnt || 0,
+      open_duplicates: duplicateVehicles.rows[0]?.cnt || 0
     });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });

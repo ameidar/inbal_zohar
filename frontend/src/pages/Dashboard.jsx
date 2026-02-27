@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Truck, CreditCard, ShieldCheck, Wrench, Users,
   AlertTriangle, AlertCircle, Info, CheckCircle, BarChart2
@@ -19,9 +19,15 @@ function daysTo(d) {
   return Math.floor((new Date(d) - new Date()) / 86400000);
 }
 
-function StatCard({ value, label, sub, color, Icon }) {
+function StatCard({ value, label, sub, color, Icon, onClick }) {
   return (
-    <div className="stat-card">
+    <div
+      className="stat-card"
+      onClick={onClick}
+      style={{ cursor: onClick ? 'pointer' : 'default', transition: 'box-shadow 0.15s' }}
+      onMouseEnter={e => { if (onClick) e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.10)'; }}
+      onMouseLeave={e => { if (onClick) e.currentTarget.style.boxShadow = ''; }}
+    >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <div className="stat-value" style={{ color: color || 'var(--primary)' }}>{value ?? '—'}</div>
@@ -44,6 +50,7 @@ export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [alerts, setAlerts] = useState([]);
   const [vehicles, setVehicles] = useState([]);
+  const navigate = useNavigate();
 
   useEffect(() => {
     api.dashStats().then(setStats).catch(() => {});
@@ -59,15 +66,22 @@ export default function Dashboard() {
     <div>
       {/* Stats */}
       <div className="stats-grid">
-        <StatCard value={activeVehicles} label="רכבים פעילים" sub={`מתוך ${totalVehicles} סה"כ`} Icon={Truck} />
+        <StatCard value={activeVehicles} label="רכבים פעילים" sub={`מתוך ${totalVehicles} סה"כ`} Icon={Truck} onClick={() => navigate('/dept/vehicles/list')} />
         <StatCard value={stats?.pending_payments_30d}
           label="תשלומים ממתינים (30 יום)"
           color={stats?.pending_payments_30d > 0 ? 'var(--danger)' : 'var(--success)'}
-          Icon={CreditCard} />
-        <StatCard value={stats?.active_policies} label="פוליסות פעילות" Icon={ShieldCheck} />
+          Icon={CreditCard}
+          onClick={() => navigate('/dept/vehicles/policies/payments')} />
+        <StatCard value={stats?.active_policies} label="פוליסות פעילות" Icon={ShieldCheck} onClick={() => navigate('/dept/vehicles/policies/list')} />
         <StatCard value={stats?.open_maintenance} label="טיפולים פתוחים"
           color={stats?.open_maintenance > 0 ? 'var(--warning)' : 'var(--success)'}
-          Icon={Wrench} />
+          Icon={Wrench}
+          onClick={() => navigate('/dept/vehicles/maintenance/list')} />
+        <StatCard value={stats?.open_duplicates ?? 0}
+          label="כפילויות פתוחות"
+          color={stats?.open_duplicates > 0 ? 'var(--danger)' : 'var(--success)'}
+          Icon={BarChart2}
+          onClick={() => navigate('/dept/vehicles/duplicates')} />
         <StatCard value={stats?.active_employees} label="עובדים פעילים" Icon={Users} />
       </div>
 
@@ -133,7 +147,7 @@ export default function Dashboard() {
             <Truck size={15} strokeWidth={2} style={{ color: 'var(--primary)' }} />
             סקירת רכבים
           </span>
-          <Link to="/vehicles" className="btn btn-secondary btn-sm">כל הרכבים</Link>
+          <Link to="/dept/vehicles/list" className="btn btn-secondary btn-sm">כל הרכבים</Link>
         </div>
         <div className="table-wrap">
           <table>
@@ -157,7 +171,7 @@ export default function Dashboard() {
                 return (
                   <tr key={v.id}>
                     <td>
-                      <Link to={`/vehicles/${v.id}`} style={{ color: 'var(--primary)', fontWeight: 600 }}>
+                      <Link to={`/dept/vehicles/${v.id}/overview`} style={{ color: 'var(--primary)', fontWeight: 600 }}>
                         {v.vehicle_number}
                       </Link>
                     </td>
