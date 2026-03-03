@@ -680,6 +680,23 @@ export default function VehicleDetail() {
             <Field label="סטטוס">{sel(maintenanceForm, setMaintenanceForm, 'status', ['בוצע','בהמתנה','בתיקון','בוטל'])}</Field>
             <Field label="טיפול הבא">{inp(maintenanceForm, setMaintenanceForm, 'next_date', 'date')}</Field>
           </div>
+          <div className="form-row">
+            <Field label="אמצעי תשלום">
+              <select className="form-control" value={maintenanceForm.payment_method_id||''} onChange={e=>setMaintenanceForm(f=>({...f,payment_method_id:+e.target.value||null}))}>
+                <option value="">בחר אמצעי תשלום</option>
+                {paymentMethods.map(pm=><option key={pm.id} value={pm.id}>{pm.name}</option>)}
+              </select>
+            </Field>
+            <Field label="תנאי תשלום">
+              <select className="form-control" value={maintenanceForm.payment_terms||''} onChange={e=>setMaintenanceForm(f=>({...f,payment_terms:e.target.value}))}>
+                <option value="">מיידי</option>
+                <option value="שוטף 30">שוטף 30</option>
+                <option value="שוטף 60">שוטף 60</option>
+                <option value="שוטף 90">שוטף 90</option>
+                <option value="שוטף 120">שוטף 120</option>
+              </select>
+            </Field>
+          </div>
           <Field label="תיאור">
             <textarea className="form-control" rows={2} value={maintenanceForm.description||''} onChange={e=>setMaintenanceForm(f=>({...f,description:e.target.value}))}/>
           </Field>
@@ -784,8 +801,12 @@ export default function VehicleDetail() {
             </Field>
           </div>
           <div className="form-row">
-            <Field label="סוג דלק">{sel(fuelCardForm, setFuelCardForm, 'fuel_type', ['סולר','בנזין','גז','חשמל'])}</Field>
+            <Field label="סוג דלק">{sel(fuelCardForm, setFuelCardForm, 'fuel_type', ['סולר','בנזין','אוריאה','אחר'])}</Field>
             <Field label="סטטוס">{sel(fuelCardForm, setFuelCardForm, 'status', ['פעיל','לא פעיל','חסום'])}</Field>
+          </div>
+          <div className="form-row">
+            <Field label="קוד שירות"><input className="form-control" placeholder="קוד שירות (אופציונלי)" value={fuelCardForm.service_code||''} onChange={e=>setFuelCardForm(f=>({...f,service_code:e.target.value}))}/></Field>
+            <Field label="סוג כרטיס">{sel(fuelCardForm, setFuelCardForm, 'card_type', ['דלק','Master','אחר'])}</Field>
           </div>
           <div className="form-row">
             <Field label="הגבלה יומית (₪)">{inp(fuelCardForm, setFuelCardForm, 'daily_limit', 'number')}</Field>

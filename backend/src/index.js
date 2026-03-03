@@ -42,7 +42,7 @@ app.use('/api/employees', auth, crud('employees',
 ));
 
 app.use('/api/maintenance', auth, crud('maintenance',
-  ['vehicle_id','garage_id','maintenance_type','maintenance_date','odometer','description','cost','payment_method_id','status','next_date','notes'],
+  ['vehicle_id','garage_id','maintenance_type','maintenance_date','odometer','description','cost','payment_method_id','payment_terms','status','next_date','notes'],
   { orderBy: 'maintenance_date DESC' }
 ));
 

@@ -33,7 +33,15 @@ router.get('/', async (req, res) => {
         (SELECT MIN(next_inspection_date) FROM inspections WHERE vehicle_id=v.id AND next_inspection_date IS NOT NULL AND next_inspection_date >= CURRENT_DATE) as next_inspection_date,
         (SELECT MIN(expiry_date) FROM insurance_policies WHERE vehicle_id=v.id AND status='פעילה') as policy_expiry_date,
         EXISTS(SELECT 1 FROM insurance_policies WHERE vehicle_id=v.id AND status='פעילה' AND coverage_type IN ('חובה','חובה + מקיף','חובה + צד ג'''))::boolean as has_mandatory,
-        EXISTS(SELECT 1 FROM insurance_policies WHERE vehicle_id=v.id AND status='פעילה' AND coverage_type IN ('מקיף','חובה + מקיף'))::boolean as has_comprehensive
+        EXISTS(SELECT 1 FROM insurance_policies WHERE vehicle_id=v.id AND status='פעילה' AND coverage_type IN ('מקיף','חובה + מקיף'))::boolean as has_comprehensive,
+        (SELECT json_build_object('policy_number',policy_number,'expiry_date',expiry_date,'insurer',insurer,'coverage_type',coverage_type)
+         FROM insurance_policies WHERE vehicle_id=v.id AND status='פעילה' AND coverage_type IN ('חובה','חובה + מקיף','חובה + צד ג''')
+         ORDER BY expiry_date DESC LIMIT 1) as mandatory_policy,
+        (SELECT json_build_object('policy_number',policy_number,'expiry_date',expiry_date,'insurer',insurer,'coverage_type',coverage_type)
+         FROM insurance_policies WHERE vehicle_id=v.id AND status='פעילה' AND coverage_type IN ('מקיף','חובה + מקיף')
+         ORDER BY expiry_date DESC LIMIT 1) as comprehensive_policy,
+        (SELECT json_agg(json_build_object('policy_number',policy_number,'coverage_type',coverage_type,'insurer',insurer,'expiry_date',expiry_date,'status',status))
+         FROM insurance_policies WHERE vehicle_id=v.id AND status='פעילה') as active_policies
       FROM vehicles v
       ${where.length ? 'WHERE '+where.join(' AND ') : ''}
       ORDER BY v.vehicle_number

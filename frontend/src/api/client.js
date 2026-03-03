@@ -84,6 +84,7 @@ export const api = {
   fuelCards: (params='') => req('GET', `/fuel/cards${params}`),
   createFuelCard: (d) => req('POST', '/fuel/cards', d),
   updateFuelCard: (id, d) => req('PUT', `/fuel/cards/${id}`, d),
+  deleteFuelCard: (id) => req('DELETE', `/fuel/cards/${id}`),
 
   // Settings
   garages: () => req('GET', '/garages'),

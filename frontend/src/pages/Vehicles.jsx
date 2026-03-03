@@ -4,7 +4,7 @@ import { api } from '../api/client';
 
 const STATUSES = ['פעיל','מושבת','נמכר','בהקפאה'];
 const TYPES = ['מכונית','משאית','נגרר','צמ"ה','כלי תפעולי'];
-const FUEL_TYPES = ['בנזין','סולר','אחר'];
+const FUEL_TYPES = ['סולר','בנזין','אוריאה','אחר'];
 
 function fmtDate(d) { return d ? new Date(d).toLocaleDateString('he-IL') : '—'; }
 
@@ -62,16 +62,52 @@ function VehicleCard({ v, onEdit, onDel, isAdmin }) {
           </div>
         </Link>
 
-        {/* Insurance checkmarks */}
-        <div style={{ display: 'flex', gap: 10, marginTop: 4, fontSize: 12 }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 4,
-            color: v.has_mandatory ? '#15803d' : '#dc2626', fontWeight: 600 }}>
-            {v.has_mandatory ? '✅' : '❌'} חובה
-          </span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 4,
-            color: v.has_comprehensive ? '#15803d' : '#dc2626', fontWeight: 600 }}>
-            {v.has_comprehensive ? '✅' : '❌'} מקיף
-          </span>
+        {/* Insurance info */}
+        <div style={{ display: 'flex', flexDirection:'column', gap: 3, marginTop: 4, fontSize: 11 }}>
+          {/* Mandatory */}
+          <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+            <span style={{ color: v.has_mandatory ? '#15803d' : '#dc2626', fontWeight:700, fontSize:12 }}>
+              {v.has_mandatory ? '✅' : '❌'} חובה
+            </span>
+            {v.mandatory_policy && (
+              <span style={{ color:'#374151' }}>
+                {v.mandatory_policy.insurer && <span style={{color:'#6b7280'}}>{v.mandatory_policy.insurer} · </span>}
+                {v.mandatory_policy.policy_number && <span>פוליסה {v.mandatory_policy.policy_number} · </span>}
+                {v.mandatory_policy.expiry_date && (
+                  <span style={{ color: new Date(v.mandatory_policy.expiry_date) < new Date(Date.now()+30*86400000) ? '#dc2626' : '#374151' }}>
+                    פג {new Date(v.mandatory_policy.expiry_date).toLocaleDateString('he-IL',{day:'2-digit',month:'2-digit',year:'2-digit'})}
+                  </span>
+                )}
+              </span>
+            )}
+          </div>
+          {/* Comprehensive */}
+          <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+            <span style={{ color: v.has_comprehensive ? '#15803d' : '#dc2626', fontWeight:700, fontSize:12 }}>
+              {v.has_comprehensive ? '✅' : '❌'} מקיף
+            </span>
+            {v.comprehensive_policy && (
+              <span style={{ color:'#374151' }}>
+                {v.comprehensive_policy.insurer && <span style={{color:'#6b7280'}}>{v.comprehensive_policy.insurer} · </span>}
+                {v.comprehensive_policy.policy_number && <span>פוליסה {v.comprehensive_policy.policy_number} · </span>}
+                {v.comprehensive_policy.expiry_date && (
+                  <span style={{ color: new Date(v.comprehensive_policy.expiry_date) < new Date(Date.now()+30*86400000) ? '#dc2626' : '#374151' }}>
+                    פג {new Date(v.comprehensive_policy.expiry_date).toLocaleDateString('he-IL',{day:'2-digit',month:'2-digit',year:'2-digit'})}
+                  </span>
+                )}
+              </span>
+            )}
+          </div>
+          {/* Other active policies */}
+          {v.active_policies && v.active_policies.filter(p=>!['חובה','מקיף','חובה + מקיף','חובה + צד ג\''].includes(p.coverage_type)).map((p,i)=>(
+            <div key={i} style={{ display:'flex', alignItems:'center', gap:4, color:'#374151' }}>
+              <span style={{color:'#0369a1',fontWeight:700,fontSize:12}}>✅ {p.coverage_type}</span>
+              {p.insurer && <span style={{color:'#6b7280'}}>{p.insurer} · </span>}
+              {p.expiry_date && <span style={{ color: new Date(p.expiry_date) < new Date(Date.now()+30*86400000) ? '#dc2626' : '#374151' }}>
+                פג {new Date(p.expiry_date).toLocaleDateString('he-IL',{day:'2-digit',month:'2-digit',year:'2-digit'})}
+              </span>}
+            </div>
+          ))}
         </div>
 
         {/* Actions */}
@@ -188,8 +224,32 @@ export default function Vehicles() {
                     <td>{v.year}</td>
                     <td>{v.fuel_type}</td>
                     <td><span className={`badge ${v.status==='פעיל'?'badge-green':v.status==='מושבת'?'badge-red':v.status==='בהקפאה'?'badge-yellow':'badge-gray'}`}>{v.status}</span></td>
-                    <td style={{textAlign:'center', fontSize:15}}>{v.has_mandatory ? '✅' : '❌'}</td>
-                    <td style={{textAlign:'center', fontSize:15}}>{v.has_comprehensive ? '✅' : '❌'}</td>
+                    <td style={{fontSize:11, minWidth:90}}>
+                      {v.has_mandatory ? (
+                        <div>
+                          <span style={{color:'#15803d',fontWeight:700}}>✅</span>
+                          {v.mandatory_policy?.insurer && <div style={{color:'#6b7280'}}>{v.mandatory_policy.insurer}</div>}
+                          {v.mandatory_policy?.expiry_date && (
+                            <div style={{color: new Date(v.mandatory_policy.expiry_date)<new Date(Date.now()+30*86400000)?'#dc2626':'#374151'}}>
+                              פג {new Date(v.mandatory_policy.expiry_date).toLocaleDateString('he-IL',{day:'2-digit',month:'2-digit',year:'2-digit'})}
+                            </div>
+                          )}
+                        </div>
+                      ) : <span style={{color:'#dc2626',fontWeight:700}}>❌</span>}
+                    </td>
+                    <td style={{fontSize:11, minWidth:90}}>
+                      {v.has_comprehensive ? (
+                        <div>
+                          <span style={{color:'#15803d',fontWeight:700}}>✅</span>
+                          {v.comprehensive_policy?.insurer && <div style={{color:'#6b7280'}}>{v.comprehensive_policy.insurer}</div>}
+                          {v.comprehensive_policy?.expiry_date && (
+                            <div style={{color: new Date(v.comprehensive_policy.expiry_date)<new Date(Date.now()+30*86400000)?'#dc2626':'#374151'}}>
+                              פג {new Date(v.comprehensive_policy.expiry_date).toLocaleDateString('he-IL',{day:'2-digit',month:'2-digit',year:'2-digit'})}
+                            </div>
+                          )}
+                        </div>
+                      ) : <span style={{color:'#dc2626',fontWeight:700}}>❌</span>}
+                    </td>
                     <td>{v.responsible_employee || <span style={{color:'#ef4444',fontSize:12}}>⚠️ אין</span>}</td>
                     <td style={{fontSize:12}}>{fmtDate(v.next_maintenance_date)}</td>
                     <td style={{fontSize:12}}>{fmtDate(v.next_inspection_date)}</td>

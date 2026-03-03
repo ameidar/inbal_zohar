@@ -15,7 +15,7 @@ const DEPTS = [
     dashPath: '/dept/vehicles/dashboard',
     children: [
       { to: '/dept/vehicles/dashboard', icon: LayoutDashboard, label: 'דשבורד רכבים' },
-      { to: '/dept/vehicles/list', icon: Truck, label: 'רכבים' },
+      { to: '/dept/vehicles/list', icon: Truck, label: 'רשימת רכבים' },
       { to: '/dept/vehicles/maintenance/list', icon: Wrench, label: 'טיפולים' },
       { to: '/dept/vehicles/inspections/list', icon: ScanSearch, label: 'בדיקות' },
       { to: '/dept/vehicles/fuel/invoices', icon: FuelIcon, label: 'דלק' },
@@ -65,6 +65,8 @@ export default function Sidebar({ open, onClose }) {
   function handleDeptLabelClick(dept, e) {
     e.stopPropagation();
     navigate(dept.dashPath);
+    // Also open the accordion if it has children
+    if (dept.children.length > 0) setOpenDept(dept.id);
     if (onClose) onClose();
   }
 

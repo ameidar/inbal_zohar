@@ -77,17 +77,17 @@ router.get('/cards', async (req, res) => {
     let where = []; let params = [];
     if (vehicle_id) { params.push(vehicle_id); where.push(`fc.vehicle_id=$${params.length}`); }
     if (status) { params.push(status); where.push(`fc.status=$${params.length}`); }
-    const r = await pool.query(`SELECT fc.*, v.vehicle_number, v.nickname FROM fuel_cards fc LEFT JOIN vehicles v ON v.id=fc.vehicle_id ${where.length ? 'WHERE '+where.join(' AND ') : ''} ORDER BY fc.card_number`, params);
+    const r = await pool.query(`SELECT fc.*, v.vehicle_number, v.nickname, e.name as employee_name FROM fuel_cards fc LEFT JOIN vehicles v ON v.id=fc.vehicle_id LEFT JOIN employees e ON e.id=fc.employee_id ${where.length ? 'WHERE '+where.join(' AND ') : ''} ORDER BY fc.card_number`, params);
     res.json(r.rows);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 router.post('/cards', async (req, res) => {
   try {
-    const fields = ['card_number','supplier','vehicle_id','asset_type','status','fuel_type','daily_limit','monthly_limit','notes'];
+    const fields = ['card_number','supplier','vehicle_id','employee_id','asset_type','status','fuel_type','card_type','service_code','daily_limit','monthly_limit','notes'];
     const data = req.body;
-    const cols = fields.filter(f => data[f] !== undefined);
-    const vals = cols.map(f => data[f]);
+    const cols = fields.filter(f => data[f] !== undefined && data[f] !== '');
+    const vals = cols.map(f => data[f] === '' ? null : data[f]);
     const r = await pool.query(`INSERT INTO fuel_cards (${cols.join(',')}) VALUES (${cols.map((_,i)=>'$'+(i+1)).join(',')}) RETURNING *`, vals);
     res.status(201).json(r.rows[0]);
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -95,10 +95,10 @@ router.post('/cards', async (req, res) => {
 
 router.put('/cards/:id', async (req, res) => {
   try {
-    const fields = ['card_number','supplier','vehicle_id','asset_type','status','fuel_type','daily_limit','monthly_limit','notes'];
+    const fields = ['card_number','supplier','vehicle_id','employee_id','asset_type','status','fuel_type','card_type','service_code','daily_limit','monthly_limit','notes'];
     const data = req.body;
     const cols = fields.filter(f => data[f] !== undefined);
-    const vals = [...cols.map(f => data[f]), req.params.id];
+    const vals = [...cols.map(f => data[f] === '' ? null : data[f]), req.params.id];
     const r = await pool.query(`UPDATE fuel_cards SET ${cols.map((f,i)=>`${f}=$${i+1}`).join(',')} WHERE id=$${vals.length} RETURNING *`, vals);
     if (!r.rows[0]) return res.status(404).json({ error: 'Not found' });
     res.json(r.rows[0]);
