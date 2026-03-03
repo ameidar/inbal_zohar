@@ -29,6 +29,7 @@ import ToolCategories from './pages/ToolCategories';
 import Duplicates from './pages/Duplicates';
 import MissingData from './pages/MissingData';
 import PolicyMonthlySummary from './pages/PolicyMonthlySummary';
+import DieselReports from './pages/DieselReports';
 
 function getUser() {
   try { return JSON.parse(localStorage.getItem('fleet_user') || 'null'); } catch { return null; }
@@ -164,6 +165,7 @@ export default function App() {
                 <Route path="vehicles/duplicates" element={<Duplicates />} />
                 <Route path="vehicles/reports/payment-methods" element={<PaymentMethodsReport />} />
                 <Route path="vehicles/reports/monthly-summary" element={<PolicyMonthlySummary />} />
+                <Route path="vehicles/reports/diesel" element={<DieselReports />} />
 
                 {/* Placeholder depts */}
                 <Route path="finance" element={<Finance />} />

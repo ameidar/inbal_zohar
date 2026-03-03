@@ -85,6 +85,7 @@ export const api = {
   createFuelCard: (d) => req('POST', '/fuel/cards', d),
   updateFuelCard: (id, d) => req('PUT', `/fuel/cards/${id}`, d),
   deleteFuelCard: (id) => req('DELETE', `/fuel/cards/${id}`),
+  importToolsExcel: (formData, dryRun = false) => reqForm('POST', `/tools/import-excel${dryRun ? '?dry_run=1' : ''}`, formData),
 
   // Settings
   garages: () => req('GET', '/garages'),

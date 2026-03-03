@@ -41,6 +41,8 @@ app.use('/api/employees', auth, crud('employees',
   { orderBy: 'name' }
 ));
 
+app.use('/api/tools', auth, require('./routes/tools-import'));
+app.use('/api/reports', auth, require('./routes/reports'));
 app.use('/api/maintenance', auth, crud('maintenance',
   ['vehicle_id','garage_id','maintenance_type','maintenance_date','odometer','description','cost','payment_method_id','payment_terms','status','next_date','notes'],
   { orderBy: 'maintenance_date DESC' }
