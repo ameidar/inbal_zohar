@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 
-const DOC_TYPES = ['תעודת רישום','ביטוח','טסט','חוזה','תמונה','מסמך משפטי','אחר'];
+const DOC_TYPES = ['פוליסת ביטוח','מסמכי רכישה','תעודת רישום','טסט','חוזה','תמונה','רישיון מפעיל','מסמך משפטי','חשבונית','אחר'];
 const ENTITY_TYPES = ['Vehicle', 'Policy', 'Maintenance', 'Inspection', 'Tool'];
 const ENTITY_TYPE_HE = { Vehicle: 'רכב', Policy: 'פוליסה', Maintenance: 'טיפול', Inspection: 'בדיקה', Tool: 'כלי' };
 
@@ -29,7 +29,7 @@ export default function Documents({ linkedEntityType: propEntityType, linkedEnti
 
   const [docs, setDocs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({ linkedEntityType: entityType, linkedEntityId: entityId });
+  const [filters, setFilters] = useState({ linkedEntityType: entityType, linkedEntityId: entityId, document_type: '', dateFrom: '', dateTo: '' });
   const [modal, setModal] = useState(null);
   const [form, setForm] = useState({ document_type: '', linked_entity_type: '', linked_entity_id: '', date: '', notes: '' });
   const [file, setFile] = useState(null);
@@ -40,7 +40,7 @@ export default function Documents({ linkedEntityType: propEntityType, linkedEnti
 
   function load() {
     setLoading(true);
-    api.getDocuments(filters.linkedEntityType, filters.linkedEntityId)
+    api.getDocuments(filters.linkedEntityType, filters.linkedEntityId, filters.document_type, filters.dateFrom, filters.dateTo)
       .then(setDocs).catch(() => {}).finally(() => setLoading(false));
   }
   useEffect(() => { load(); }, [filters]);
@@ -78,13 +78,25 @@ export default function Documents({ linkedEntityType: propEntityType, linkedEnti
       </div>
 
       {!propEntityType && (
-        <div style={{ display: 'flex', gap: 10, marginBottom: 16, background: '#f8f9fa', padding: 12, borderRadius: 8, flexWrap: 'wrap' }}>
-          <select className="input-field" style={{ width: 'auto' }} value={filters.linkedEntityType} onChange={e => setFilters(f => ({ ...f, linkedEntityType: e.target.value }))}>
-            <option value="">כל הסוגים</option>
+        <div style={{ display: 'flex', gap: 10, marginBottom: 16, background: '#f8f9fa', padding: 12, borderRadius: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <select className="form-control" style={{ width: 'auto', minWidth: 140 }} value={filters.document_type} onChange={e => setFilters(f => ({ ...f, document_type: e.target.value }))}>
+            <option value="">כל סוגי המסמכים</option>
+            {DOC_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+          <select className="form-control" style={{ width: 'auto', minWidth: 120 }} value={filters.linkedEntityType} onChange={e => setFilters(f => ({ ...f, linkedEntityType: e.target.value }))}>
+            <option value="">כל הישויות</option>
             {ENTITY_TYPES.map(t => <option key={t} value={t}>{ENTITY_TYPE_HE[t]}</option>)}
           </select>
-          <input className="input-field" style={{ width: 120 }} placeholder="ID ישות" value={filters.linkedEntityId} onChange={e => setFilters(f => ({ ...f, linkedEntityId: e.target.value }))} />
-          <button className="btn-secondary" onClick={() => setFilters({ linkedEntityType: '', linkedEntityId: '' })}>נקה</button>
+          <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+            <span style={{fontSize:12,color:'#6b7280'}}>מ-</span>
+            <input className="form-control" type="date" style={{ width: 130 }} value={filters.dateFrom} onChange={e => setFilters(f => ({ ...f, dateFrom: e.target.value }))} />
+          </div>
+          <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+            <span style={{fontSize:12,color:'#6b7280'}}>עד</span>
+            <input className="form-control" type="date" style={{ width: 130 }} value={filters.dateTo} onChange={e => setFilters(f => ({ ...f, dateTo: e.target.value }))} />
+          </div>
+          <button className="btn btn-secondary btn-sm" onClick={() => setFilters({ linkedEntityType: '', linkedEntityId: '', document_type: '', dateFrom: '', dateTo: '' })}>נקה הכל</button>
+          <span style={{ fontSize: 12, color: '#6b7280', marginRight: 'auto' }}>{docs.length} מסמכים</span>
         </div>
       )}
 

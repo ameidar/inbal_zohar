@@ -112,3 +112,31 @@ if (require('fs').existsSync(distPath)) {
 
 const PORT = process.env.PORT || 3010;
 app.listen(PORT, '0.0.0.0', () => console.log(`Fleet backend running on port ${PORT}`));
+
+// ── Daily payment reminder cron (08:00 Israel time = 06:00 UTC) ──────────────
+try {
+  const cron = require('node-cron');
+  const pool = require('./db');
+  cron.schedule('0 6 * * *', async () => {
+    try {
+      const r = await pool.query(`
+        SELECT psi.*, ip.policy_number, ip.insurer, v.vehicle_number, pm.name as pm_name
+        FROM payment_schedule_items psi
+        LEFT JOIN insurance_policies ip ON ip.id = psi.policy_id
+        LEFT JOIN vehicles v ON v.id = ip.vehicle_id
+        LEFT JOIN payment_methods pm ON pm.id = psi.payment_method_id
+        WHERE psi.status IN ('Planned','Charged') AND psi.charge_date <= CURRENT_DATE
+        ORDER BY psi.charge_date
+      `);
+      if (r.rows.length > 0) {
+        console.log(`\n[📅 Daily Payment Reminder] ${new Date().toLocaleDateString('he-IL')} — ${r.rows.length} תשלומים ממתינים:`);
+        r.rows.forEach(row => {
+          console.log(`  • ${row.pm_name||'?'} | ${row.policy_number||'?'} | ${row.vehicle_number||'ללא רכב'} | ₪${row.amount} | ${row.charge_date?.toISOString().split('T')[0]}`);
+        });
+      } else {
+        console.log(`[📅 Daily Payment Reminder] אין תשלומים ממתינים להיום.`);
+      }
+    } catch (e) { console.error('[Cron] Payment reminder error:', e.message); }
+  }, { timezone: 'Asia/Jerusalem' });
+  console.log('✅ Daily payment cron scheduled (08:00 IL)');
+} catch (e) { console.warn('⚠️ node-cron not available:', e.message); }

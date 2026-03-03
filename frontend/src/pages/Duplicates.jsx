@@ -86,9 +86,49 @@ function MergeModal({ primaryRecord, secondaryRecord, fields, onConfirm, onClose
   );
 }
 
+function EditVehicleModal({ vehicle, onSave, onClose }) {
+  const [form, setForm] = useState({ ...vehicle });
+  const [saving, setSaving] = useState(false);
+  const f = (k, val) => setForm(p => ({ ...p, [k]: val }));
+  async function save() {
+    setSaving(true);
+    try {
+      await api.updateVehicle(vehicle.id, form);
+      onSave();
+      onClose();
+    } catch (e) { alert(e.message); }
+    finally { setSaving(false); }
+  }
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+      <div style={{ background:'#fff', borderRadius:12, padding:24, width:'100%', maxWidth:520, maxHeight:'90vh', overflow:'auto', boxShadow:'0 8px 40px rgba(0,0,0,0.2)' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
+          <h3 style={{ margin:0 }}>✏️ עריכת רכב #{vehicle.id}</h3>
+          <button onClick={onClose} style={{ border:'none', background:'none', cursor:'pointer', fontSize:20 }}>✕</button>
+        </div>
+        {[['vehicle_number','מספר רכב'],['nickname','כינוי'],['manufacturer','יצרן'],['model','דגם'],['year','שנה','number'],['chassis_number','מספר שילדה'],['fuel_type','סוג דלק'],['status','סטטוס']].map(([key,label,type])=>(
+          <div key={key} style={{ marginBottom:10 }}>
+            <label style={{ fontSize:12, fontWeight:600, display:'block', marginBottom:3 }}>{label}</label>
+            <input className="form-control" type={type||'text'} value={form[key]||''} onChange={e=>f(key, e.target.value)}/>
+          </div>
+        ))}
+        <div style={{ marginBottom:10 }}>
+          <label style={{ fontSize:12, fontWeight:600, display:'block', marginBottom:3 }}>הערות</label>
+          <textarea className="form-control" rows={2} value={form.notes||''} onChange={e=>f('notes',e.target.value)}/>
+        </div>
+        <div style={{ display:'flex', gap:8, justifyContent:'flex-end', marginTop:12 }}>
+          <button className="btn btn-secondary" onClick={onClose}>ביטול</button>
+          <button className="btn btn-primary" onClick={save} disabled={saving}>{saving?'שומר...':'שמור שינויים'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function VehicleGroup({ group, onRefresh }) {
   const [expanded, setExpanded] = useState(false);
   const [mergeModal, setMergeModal] = useState(null);
+  const [editVehicle, setEditVehicle] = useState(null);
   const [primaryId, setPrimaryId] = useState('');
   const [secondaryId, setSecondaryId] = useState('');
   const user = JSON.parse(localStorage.getItem('fleet_user') || '{}');
@@ -139,10 +179,13 @@ function VehicleGroup({ group, onRefresh }) {
                     <td style={{ padding: 8 }}>{v.manufacturer} {v.model}</td>
                     <td style={{ padding: 8 }}>{v.year || '—'}</td>
                     <td style={{ padding: 8 }}>{v.status || '—'}</td>
-                    <td style={{ padding: 8 }}>
+                    <td style={{ padding: 8, display:'flex', gap:6 }}>
                       <Link to={`/dept/vehicles/${v.id}/overview`}>
-                        <button className="btn-sm">פתח</button>
+                        <button className="btn btn-secondary btn-sm">פתח</button>
                       </Link>
+                      {isAdmin && (
+                        <button className="btn btn-secondary btn-sm" onClick={()=>setEditVehicle(v)}>✏️ ערוך</button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -181,6 +224,14 @@ function VehicleGroup({ group, onRefresh }) {
               fields={VEHICLE_FIELDS}
               onConfirm={doMerge}
               onClose={() => setMergeModal(null)}
+            />
+          )}
+
+          {editVehicle && (
+            <EditVehicleModal
+              vehicle={editVehicle}
+              onSave={onRefresh}
+              onClose={() => setEditVehicle(null)}
             />
           )}
         </div>

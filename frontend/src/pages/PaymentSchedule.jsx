@@ -36,9 +36,11 @@ export default function PaymentSchedule() {
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [filters, setFilters] = useState({
     policyId: searchParams.get('policyId') || '',
-    month: searchParams.get('month') || '',
+    month: searchParams.get('month') || new Date().toISOString().slice(0,7),
     status: searchParams.get('status') || '',
+    paymentMethodId: searchParams.get('paymentMethodId') || '',
   });
+  const [todayItems, setTodayItems] = useState([]);
   const [modal, setModal] = useState(null);
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
@@ -47,7 +49,7 @@ export default function PaymentSchedule() {
 
   function load() {
     setLoading(true);
-    const params = Object.entries(filters).filter(([,v]) => v).map(([k,v]) => `${k}=${v}`).join('&');
+    const params = Object.entries(filters).filter(([,v]) => v).map(([k,v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
     api.getPaymentSchedule(params ? '?' + params : '').then(setItems).catch(() => {}).finally(() => setLoading(false));
   }
 
@@ -55,6 +57,7 @@ export default function PaymentSchedule() {
   useEffect(() => {
     api.policies().then(d => setPolicies(Array.isArray(d) ? d : [])).catch(() => {});
     api.getPaymentMethods().then(d => setPaymentMethods(Array.isArray(d) ? d : [])).catch(() => {});
+    api.getPaymentScheduleToday().then(d => setTodayItems(Array.isArray(d) ? d : [])).catch(() => {});
   }, []);
 
   async function updateStatus(item, status) {
@@ -106,18 +109,58 @@ export default function PaymentSchedule() {
         </div>
       </div>
 
+      {/* Today's payments banner */}
+      {todayItems.length > 0 && (
+        <div style={{ background:'#fef3c7', border:'1px solid #f59e0b', borderRadius:10, padding:'12px 16px', marginBottom:16 }}>
+          <div style={{ fontWeight:700, fontSize:14, marginBottom:8, color:'#92400e' }}>
+            ⚡ תשלומים לתשלום היום / בפיגור — {todayItems.length} פריטים, סה"כ ₪{todayItems.reduce((s,i)=>s+parseFloat(i.amount||0),0).toLocaleString('he-IL')}
+          </div>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+            {todayItems.slice(0,6).map(item => (
+              <span key={item.id} style={{ background:'#fff', border:'1px solid #fcd34d', borderRadius:8, padding:'3px 10px', fontSize:12, color:'#374151' }}>
+                {item.payment_method_name||'?'} · {item.policy_number||'?'} · ₪{parseFloat(item.amount||0).toLocaleString('he-IL')}
+                <button style={{ marginRight:6, border:'none', background:'#dcfce7', color:'#15803d', borderRadius:4, cursor:'pointer', padding:'0 6px', fontSize:11 }}
+                  onClick={()=>updateStatus(item,'Paid')}>✓ שולם</button>
+              </span>
+            ))}
+            {todayItems.length > 6 && <span style={{fontSize:12,color:'#92400e'}}>+{todayItems.length-6} נוספים</span>}
+          </div>
+        </div>
+      )}
+
       {/* Filters */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', background: '#f8f9fa', padding: 12, borderRadius: 8 }}>
-        <select className="input-field" style={{ width: 'auto' }} value={filters.policyId} onChange={e => setFilters(f => ({ ...f, policyId: e.target.value }))}>
-          <option value="">כל הפוליסות</option>
-          {policies.map(p => <option key={p.id} value={p.id}>{p.policy_number} - {p.insurer}</option>)}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', background: '#f8f9fa', padding: 12, borderRadius: 8, alignItems:'center' }}>
+        <input className="form-control" style={{ width: 130 }} type="month" value={filters.month} onChange={e => setFilters(f => ({ ...f, month: e.target.value }))} />
+        <select className="form-control" style={{ width: 'auto', minWidth:140 }} value={filters.paymentMethodId} onChange={e => setFilters(f => ({ ...f, paymentMethodId: e.target.value }))}>
+          <option value="">כל אמצעי התשלום</option>
+          {paymentMethods.map(pm => <option key={pm.id} value={pm.id}>{pm.name}</option>)}
         </select>
-        <input className="input-field" style={{ width: 130 }} type="month" value={filters.month} onChange={e => setFilters(f => ({ ...f, month: e.target.value }))} placeholder="חודש" />
-        <select className="input-field" style={{ width: 'auto' }} value={filters.status} onChange={e => setFilters(f => ({ ...f, status: e.target.value }))}>
+        <select className="form-control" style={{ width: 'auto', minWidth:120 }} value={filters.status} onChange={e => setFilters(f => ({ ...f, status: e.target.value }))}>
           <option value="">כל הסטטוסים</option>
           {STATUSES.map(s => <option key={s} value={s}>{STATUS_HE[s]}</option>)}
         </select>
-        <button className="btn-secondary" onClick={() => setFilters({ policyId: '', month: '', status: '' })}>נקה</button>
+        <select className="form-control" style={{ width: 'auto', minWidth:130 }} value={filters.policyId} onChange={e => setFilters(f => ({ ...f, policyId: e.target.value }))}>
+          <option value="">כל הפוליסות</option>
+          {policies.map(p => <option key={p.id} value={p.id}>{p.policy_number||p.id} - {p.insurer||''}</option>)}
+        </select>
+        <button className="btn btn-secondary btn-sm" onClick={() => setFilters({ policyId: '', month: new Date().toISOString().slice(0,7), status: '', paymentMethodId: '' })}>נקה</button>
+        {/* Summary by PM for selected month */}
+        {filters.month && items.length > 0 && (() => {
+          const grouped = {};
+          items.forEach(i => {
+            const k = i.payment_method_name || 'ללא אמצעי';
+            grouped[k] = (grouped[k]||0) + parseFloat(i.amount||0);
+          });
+          return (
+            <div style={{ marginRight:'auto', display:'flex', gap:8, flexWrap:'wrap', fontSize:12 }}>
+              {Object.entries(grouped).map(([name,total])=>(
+                <span key={name} style={{background:'#e0f2fe',color:'#0369a1',padding:'2px 10px',borderRadius:12,fontWeight:600}}>
+                  {name}: ₪{total.toLocaleString('he-IL')}
+                </span>
+              ))}
+            </div>
+          );
+        })()}
       </div>
 
       {loading ? <p>טוען...</p> : (

@@ -19,10 +19,13 @@ const upload = multer({ storage, limits: { fileSize: 20 * 1024 * 1024 } });
 // GET with filters
 router.get('/', async (req, res) => {
   try {
-    const { linkedEntityType, linkedEntityId } = req.query;
+    const { linkedEntityType, linkedEntityId, document_type, dateFrom, dateTo } = req.query;
     let where = []; let params = [];
     if (linkedEntityType) { params.push(linkedEntityType); where.push(`linked_entity_type=$${params.length}`); }
     if (linkedEntityId) { params.push(linkedEntityId); where.push(`linked_entity_id=$${params.length}`); }
+    if (document_type) { params.push(document_type); where.push(`document_type=$${params.length}`); }
+    if (dateFrom) { params.push(dateFrom); where.push(`date>=$${params.length}`); }
+    if (dateTo) { params.push(dateTo); where.push(`date<=$${params.length}`); }
 
     const r = await pool.query(`
       SELECT * FROM vehicle_documents

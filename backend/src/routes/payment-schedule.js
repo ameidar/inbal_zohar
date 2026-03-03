@@ -23,14 +23,34 @@ router.get('/summary', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// GET today's payments (due today and overdue unpaid)
+router.get('/today', async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT psi.*, ip.policy_number, ip.insurer, ip.coverage_type,
+             v.vehicle_number, v.nickname,
+             pm.name as payment_method_name, pm.payment_type
+      FROM payment_schedule_items psi
+      LEFT JOIN insurance_policies ip ON ip.id = psi.policy_id
+      LEFT JOIN vehicles v ON v.id = ip.vehicle_id
+      LEFT JOIN payment_methods pm ON pm.id = psi.payment_method_id
+      WHERE psi.status IN ('Planned','Charged')
+        AND psi.charge_date <= CURRENT_DATE
+      ORDER BY psi.charge_date, pm.name
+    `);
+    res.json(r.rows);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // GET all with filters
 router.get('/', async (req, res) => {
   try {
-    const { policyId, month, status } = req.query;
+    const { policyId, month, status, paymentMethodId } = req.query;
     let where = []; let params = [];
     if (policyId) { params.push(policyId); where.push(`psi.policy_id=$${params.length}`); }
     if (month) { params.push(month); where.push(`psi.charge_month=$${params.length}`); }
     if (status) { params.push(status); where.push(`psi.status=$${params.length}`); }
+    if (paymentMethodId) { params.push(paymentMethodId); where.push(`psi.payment_method_id=$${params.length}`); }
 
     const r = await pool.query(`
       SELECT

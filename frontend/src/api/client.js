@@ -114,15 +114,19 @@ export const api = {
   // Payment Schedule
   getPaymentSchedule: (params = '') => req('GET', `/payment-schedule${params}`),
   getPaymentScheduleSummary: () => req('GET', '/payment-schedule/summary'),
+  getPaymentScheduleToday: () => req('GET', '/payment-schedule/today'),
   createPaymentScheduleItem: (d) => req('POST', '/payment-schedule', d),
   updatePaymentScheduleItem: (id, d) => req('PUT', `/payment-schedule/${id}`, d),
   deletePaymentScheduleItem: (id) => req('DELETE', `/payment-schedule/${id}`),
 
   // Documents
-  getDocuments: (entityType = '', entityId = '') => {
+  getDocuments: (entityType = '', entityId = '', docType = '', dateFrom = '', dateTo = '') => {
     const params = new URLSearchParams();
     if (entityType) params.set('linkedEntityType', entityType);
     if (entityId) params.set('linkedEntityId', entityId);
+    if (docType) params.set('document_type', docType);
+    if (dateFrom) params.set('dateFrom', dateFrom);
+    if (dateTo) params.set('dateTo', dateTo);
     const qs = params.toString();
     return req('GET', `/documents${qs ? '?' + qs : ''}`);
   },
